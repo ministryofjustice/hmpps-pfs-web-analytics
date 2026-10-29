@@ -1,0 +1,437 @@
+package uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services
+
+import io.opentelemetry.sdk.testing.assertj.OpenTelemetryAssertions.assertThat
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
+import org.mockito.BDDMockito.given
+import org.mockito.Mock
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.then
+import org.mockito.kotlin.whenever
+import org.springframework.security.authentication.TestingAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.context.SecurityContextHolder
+import software.amazon.awssdk.services.athena.AthenaClient
+import software.amazon.awssdk.services.athena.model.ColumnInfo
+import software.amazon.awssdk.services.athena.model.Datum
+import software.amazon.awssdk.services.athena.model.GetQueryExecutionRequest
+import software.amazon.awssdk.services.athena.model.GetQueryExecutionResponse
+import software.amazon.awssdk.services.athena.model.GetQueryResultsRequest
+import software.amazon.awssdk.services.athena.model.GetQueryResultsResponse
+import software.amazon.awssdk.services.athena.model.QueryExecution
+import software.amazon.awssdk.services.athena.model.QueryExecutionContext
+import software.amazon.awssdk.services.athena.model.QueryExecutionState
+import software.amazon.awssdk.services.athena.model.QueryExecutionStatistics
+import software.amazon.awssdk.services.athena.model.QueryExecutionStatus
+import software.amazon.awssdk.services.athena.model.ResultConfiguration
+import software.amazon.awssdk.services.athena.model.ResultSet
+import software.amazon.awssdk.services.athena.model.ResultSetMetadata
+import software.amazon.awssdk.services.athena.model.Row
+import software.amazon.awssdk.services.athena.model.StartQueryExecutionRequest
+import software.amazon.awssdk.services.athena.model.StartQueryExecutionResponse
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaProperties
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaPropertiesFactory
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEvent
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.STAFF
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryRequest
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryResponse
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditDto
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.util.UUID
+import java.util.stream.Stream
+
+private const val ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS = "ROLE_QUERY_AUDIT__HMPPS_MANAGE_USERS"
+private const val ROLE_QUERY_AUDIT__HMPPS_EXTERNAL_USERS = "ROLE_QUERY_AUDIT__HMPPS_EXTERNAL_USERS"
+private const val ROLE_QUERY_AUDIT__HMPPS_ALL_SERVICES = "ROLE_QUERY_AUDIT__ALL_SERVICES"
+private const val HMPPS_MANAGE_USERS = "hmpps-manage-users"
+private const val HMPPS_EXTERNAL_USERS = "hmpps-external-users"
+private val MOCK_START_DATE = LocalDate.parse("2025-01-01")
+private val MOCK_END_DATE = LocalDate.parse("2025-02-28")
+
+@ExtendWith(MockitoExtension::class)
+class AuditAthenaClientTest {
+  private val databaseName = "databaseName"
+  private val tableName = "tableName"
+  private val workGroupName = "workGroupName"
+  private val outputLocation = "outputLocation"
+  private val queryExecutionId = "a4ab5455-dfe1-46f2-917d-5135b7dadae3"
+  private val successfulQueryExecutionResponse = GetQueryExecutionResponse.builder().queryExecution(
+    QueryExecution.builder().status(QueryExecutionStatus.builder().state(QueryExecutionState.SUCCEEDED).build())
+      .statistics(QueryExecutionStatistics.builder().build()).build(),
+  ).build()
+  private val athenaProperties = AthenaProperties(
+    auditEventType = STAFF,
+    databaseName = "databaseName",
+    tableName = "tableName",
+    workGroupName = "workGroupName",
+    outputLocation = "outputLocation",
+    s3BucketName = "s3BucketName",
+  )
+
+  @Mock
+  private lateinit var athenaClient: AthenaClient
+
+  @Mock
+  private lateinit var athenaPropertiesFactory: AthenaPropertiesFactory
+
+  @Mock
+  private lateinit var clock: Clock
+
+  @BeforeEach
+  fun setup() {
+    mockNow()
+
+    auditAthenaClient = AuditAthenaClient(
+      athenaClient,
+      athenaPropertiesFactory,
+      clock,
+      MOCK_START_DATE,
+    )
+  }
+
+  private fun mockNow() {
+    val fixedInstant = MOCK_END_DATE.atStartOfDay(ZoneId.systemDefault()).toInstant()
+    this.clock = Clock.fixed(fixedInstant, ZoneId.systemDefault())
+  }
+
+  private lateinit var auditAthenaClient: AuditAthenaClient
+
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  @Nested
+  inner class TriggerQuery {
+
+    @ParameterizedTest
+    @MethodSource("triggerQueryParameters")
+    fun triggerQuery(
+      auditQueryRequest: AuditQueryRequest,
+      roles: List<String>,
+      expectedQuery: String,
+      expectedParams: List<String>,
+      expectedServices: List<String>,
+    ) {
+      // Given
+      SecurityContextHolder.getContext().authentication =
+        TestingAuthenticationToken("user", "credentials", roles.map { SimpleGrantedAuthority(it) })
+
+      val requestBuilder = StartQueryExecutionRequest.builder()
+        .queryExecutionContext(QueryExecutionContext.builder().database(databaseName).build())
+        .resultConfiguration(ResultConfiguration.builder().outputLocation(outputLocation).build())
+        .workGroup(workGroupName)
+        .queryString(expectedQuery)
+      if (expectedParams.isNotEmpty()) {
+        requestBuilder.executionParameters(expectedParams)
+      }
+
+      given(athenaClient.startQueryExecution(requestBuilder.build()))
+        .willReturn(StartQueryExecutionResponse.builder().queryExecutionId(queryExecutionId).build())
+
+      // When
+      whenever(athenaPropertiesFactory.getProperties(STAFF)).thenReturn(athenaProperties)
+      val response: AuditQueryResponse = auditAthenaClient.triggerQuery(
+        auditQueryRequest,
+        STAFF,
+      )
+
+      // Then
+      assertThat(response.queryExecutionId).isEqualTo(UUID.fromString(queryExecutionId))
+      assertThat(response.queryState).isEqualTo(QueryExecutionState.QUEUED)
+      assertThat(response.authorisedServices).containsExactlyInAnyOrderElementsOf(expectedServices)
+    }
+
+    private fun triggerQueryParameters(): Stream<Arguments> = Stream.of(
+      // All fields
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 1),
+          endDate = LocalDate.of(2025, 1, 5),
+          who = "someone",
+          subjectId = "subjectId",
+          subjectType = "subjectType",
+        ),
+        listOf(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '1') OR (year = '2025' AND month = '1' AND day = '2') OR (year = '2025' AND month = '1' AND day = '3') OR (year = '2025' AND month = '1' AND day = '4') OR (year = '2025' AND month = '1' AND day = '5')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-01' AND DATE '2025-01-05' AND user = ? AND subjectId = ? AND subjectType = ? AND service IN (?);",
+        listOf("someone", "subjectId", "subjectType", HMPPS_MANAGE_USERS),
+        listOf(HMPPS_MANAGE_USERS),
+      ),
+
+      // Subject, no who
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 1),
+          endDate = LocalDate.of(2025, 1, 5),
+          subjectId = "subjectId",
+          subjectType = "subjectType",
+        ),
+        listOf(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS, ROLE_QUERY_AUDIT__HMPPS_EXTERNAL_USERS),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '1') OR (year = '2025' AND month = '1' AND day = '2') OR (year = '2025' AND month = '1' AND day = '3') OR (year = '2025' AND month = '1' AND day = '4') OR (year = '2025' AND month = '1' AND day = '5')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-01' AND DATE '2025-01-05' AND subjectId = ? AND subjectType = ? AND service IN (?, ?);",
+        listOf("subjectId", "subjectType", HMPPS_MANAGE_USERS, HMPPS_EXTERNAL_USERS),
+        listOf(HMPPS_MANAGE_USERS, HMPPS_EXTERNAL_USERS),
+      ),
+
+      // Subject + startDate, no who, no endDate
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 25),
+          subjectId = "subjectId",
+          subjectType = "subjectType",
+        ),
+        listOf(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '25') OR (year = '2025' AND month = '1' AND day = '26') OR (year = '2025' AND month = '1' AND day = '27') OR (year = '2025' AND month = '1' AND day = '28') OR (year = '2025' AND month = '1' AND day = '29') OR (year = '2025' AND month = '1' AND day = '30') OR (year = '2025' AND month = '1' AND day = '31') OR (year = '2025' AND month = '2' AND day = '1') OR (year = '2025' AND month = '2' AND day = '2') OR (year = '2025' AND month = '2' AND day = '3') OR (year = '2025' AND month = '2' AND day = '4') OR (year = '2025' AND month = '2' AND day = '5') OR (year = '2025' AND month = '2' AND day = '6') OR (year = '2025' AND month = '2' AND day = '7') OR (year = '2025' AND month = '2' AND day = '8') OR (year = '2025' AND month = '2' AND day = '9') OR (year = '2025' AND month = '2' AND day = '10') OR (year = '2025' AND month = '2' AND day = '11') OR (year = '2025' AND month = '2' AND day = '12') OR (year = '2025' AND month = '2' AND day = '13') OR (year = '2025' AND month = '2' AND day = '14') OR (year = '2025' AND month = '2' AND day = '15') OR (year = '2025' AND month = '2' AND day = '16') OR (year = '2025' AND month = '2' AND day = '17') OR (year = '2025' AND month = '2' AND day = '18') OR (year = '2025' AND month = '2' AND day = '19') OR (year = '2025' AND month = '2' AND day = '20') OR (year = '2025' AND month = '2' AND day = '21') OR (year = '2025' AND month = '2' AND day = '22') OR (year = '2025' AND month = '2' AND day = '23') OR (year = '2025' AND month = '2' AND day = '24') OR (year = '2025' AND month = '2' AND day = '25') OR (year = '2025' AND month = '2' AND day = '26') OR (year = '2025' AND month = '2' AND day = '27') OR (year = '2025' AND month = '2' AND day = '28')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-25' AND DATE '2025-02-28' AND subjectId = ? AND subjectType = ? AND service IN (?);",
+        listOf("subjectId", "subjectType", HMPPS_MANAGE_USERS),
+        listOf(HMPPS_MANAGE_USERS),
+      ),
+
+      // Subject + endDate, no who, no startDate
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          endDate = LocalDate.of(2025, 1, 10),
+          subjectId = "subjectId",
+          subjectType = "subjectType",
+        ),
+        listOf(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '1') OR (year = '2025' AND month = '1' AND day = '2') OR (year = '2025' AND month = '1' AND day = '3') OR (year = '2025' AND month = '1' AND day = '4') OR (year = '2025' AND month = '1' AND day = '5') OR (year = '2025' AND month = '1' AND day = '6') OR (year = '2025' AND month = '1' AND day = '7') OR (year = '2025' AND month = '1' AND day = '8') OR (year = '2025' AND month = '1' AND day = '9') OR (year = '2025' AND month = '1' AND day = '10')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-01' AND DATE '2025-01-10' AND subjectId = ? AND subjectType = ? AND service IN (?);",
+        listOf("subjectId", "subjectType", HMPPS_MANAGE_USERS),
+        listOf(HMPPS_MANAGE_USERS),
+      ),
+
+      // StartDate + endDate + who, no subject
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 1),
+          endDate = LocalDate.of(2025, 1, 15),
+          who = "someone",
+        ),
+        listOf(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '1') OR (year = '2025' AND month = '1' AND day = '2') OR (year = '2025' AND month = '1' AND day = '3') OR (year = '2025' AND month = '1' AND day = '4') OR (year = '2025' AND month = '1' AND day = '5') OR (year = '2025' AND month = '1' AND day = '6') OR (year = '2025' AND month = '1' AND day = '7') OR (year = '2025' AND month = '1' AND day = '8') OR (year = '2025' AND month = '1' AND day = '9') OR (year = '2025' AND month = '1' AND day = '10') OR (year = '2025' AND month = '1' AND day = '11') OR (year = '2025' AND month = '1' AND day = '12') OR (year = '2025' AND month = '1' AND day = '13') OR (year = '2025' AND month = '1' AND day = '14') OR (year = '2025' AND month = '1' AND day = '15')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-01' AND DATE '2025-01-15' AND user = ? AND service IN (?);",
+        listOf("someone", HMPPS_MANAGE_USERS),
+        listOf(HMPPS_MANAGE_USERS),
+      ),
+
+      // startDate + who, no subject, no endDate
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 25),
+          who = "someone",
+        ),
+        listOf(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '25') OR (year = '2025' AND month = '1' AND day = '26') OR (year = '2025' AND month = '1' AND day = '27') OR (year = '2025' AND month = '1' AND day = '28') OR (year = '2025' AND month = '1' AND day = '29') OR (year = '2025' AND month = '1' AND day = '30') OR (year = '2025' AND month = '1' AND day = '31') OR (year = '2025' AND month = '2' AND day = '1') OR (year = '2025' AND month = '2' AND day = '2') OR (year = '2025' AND month = '2' AND day = '3') OR (year = '2025' AND month = '2' AND day = '4') OR (year = '2025' AND month = '2' AND day = '5') OR (year = '2025' AND month = '2' AND day = '6') OR (year = '2025' AND month = '2' AND day = '7') OR (year = '2025' AND month = '2' AND day = '8') OR (year = '2025' AND month = '2' AND day = '9') OR (year = '2025' AND month = '2' AND day = '10') OR (year = '2025' AND month = '2' AND day = '11') OR (year = '2025' AND month = '2' AND day = '12') OR (year = '2025' AND month = '2' AND day = '13') OR (year = '2025' AND month = '2' AND day = '14') OR (year = '2025' AND month = '2' AND day = '15') OR (year = '2025' AND month = '2' AND day = '16') OR (year = '2025' AND month = '2' AND day = '17') OR (year = '2025' AND month = '2' AND day = '18') OR (year = '2025' AND month = '2' AND day = '19') OR (year = '2025' AND month = '2' AND day = '20') OR (year = '2025' AND month = '2' AND day = '21') OR (year = '2025' AND month = '2' AND day = '22') OR (year = '2025' AND month = '2' AND day = '23') OR (year = '2025' AND month = '2' AND day = '24') OR (year = '2025' AND month = '2' AND day = '25') OR (year = '2025' AND month = '2' AND day = '26') OR (year = '2025' AND month = '2' AND day = '27') OR (year = '2025' AND month = '2' AND day = '28')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-25' AND DATE '2025-02-28' AND user = ? AND service IN (?);",
+        listOf("someone", HMPPS_MANAGE_USERS),
+        listOf(HMPPS_MANAGE_USERS),
+      ),
+
+      // Authorised to query all services — no service IN clause
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 1),
+          endDate = LocalDate.of(2025, 1, 5),
+          who = "someone",
+        ),
+        listOf(ROLE_QUERY_AUDIT__HMPPS_ALL_SERVICES),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '1') OR (year = '2025' AND month = '1' AND day = '2') OR (year = '2025' AND month = '1' AND day = '3') OR (year = '2025' AND month = '1' AND day = '4') OR (year = '2025' AND month = '1' AND day = '5')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-01' AND DATE '2025-01-05' AND user = ?;",
+        listOf("someone"),
+        listOf("all-services"),
+      ),
+
+      // No authorised services
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 31),
+          who = "someone",
+        ),
+        emptyList<String>(),
+        "SELECT * FROM databaseName.$tableName WHERE 1 = 0;",
+        emptyList<String>(),
+        emptyList<String>(),
+      ),
+
+      // Values containing single quotes are passed as-is via parameterised execution — no escaping in the query string
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.of(2025, 1, 1),
+          endDate = LocalDate.of(2025, 1, 2),
+          who = "O'Reilly",
+          subjectId = "sub'ject",
+          subjectType = "type'with'quote",
+        ),
+        listOf(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS),
+        "SELECT * FROM databaseName.$tableName WHERE ((year = '2025' AND month = '1' AND day = '1') OR (year = '2025' AND month = '1' AND day = '2')) AND DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '2025-01-01' AND DATE '2025-01-02' AND user = ? AND subjectId = ? AND subjectType = ? AND service IN (?);",
+        listOf("O'Reilly", "sub'ject", "type'with'quote", HMPPS_MANAGE_USERS),
+        listOf(HMPPS_MANAGE_USERS),
+      ),
+    )
+  }
+
+  @Nested
+  inner class GetQueryResults {
+    private val expectedAuditDto = AuditDto(
+      id = UUID.randomUUID(),
+      what = "READ_USER",
+      `when` = Instant.parse("2025-01-14T12:34:56Z"),
+      operationId = "op-123",
+      subjectId = "sub-456",
+      subjectType = "User",
+      correlationId = "corr-789",
+      who = "test-user",
+      service = "auth-service",
+      details = "some details",
+    )
+    private val resultSet = ResultSet.builder()
+      .resultSetMetadata(
+        ResultSetMetadata.builder()
+          .columnInfo(
+            columnInfo("id"),
+            columnInfo("what"),
+            columnInfo("when"),
+            columnInfo("operationid"),
+            columnInfo("subjectid"),
+            columnInfo("subjecttype"),
+            columnInfo("correlationid"),
+            columnInfo("who"),
+            columnInfo("service"),
+            columnInfo("details"),
+          )
+          .build(),
+      )
+      .rows(
+        listOf(
+          Row.builder().data(
+            Datum.builder().varCharValue("id").build(),
+            Datum.builder().varCharValue("what").build(),
+            Datum.builder().varCharValue("when").build(),
+            Datum.builder().varCharValue("operationId").build(),
+            Datum.builder().varCharValue("subjectId").build(),
+            Datum.builder().varCharValue("subjectType").build(),
+            Datum.builder().varCharValue("correlationId").build(),
+            Datum.builder().varCharValue("who").build(),
+            Datum.builder().varCharValue("service").build(),
+            Datum.builder().varCharValue("details").build(),
+          ).build(),
+          Row.builder().data(
+            Datum.builder().varCharValue(expectedAuditDto.id.toString()).build(),
+            Datum.builder().varCharValue(expectedAuditDto.what).build(),
+            Datum.builder().varCharValue(expectedAuditDto.`when`.toString()).build(),
+            Datum.builder().varCharValue(expectedAuditDto.operationId).build(),
+            Datum.builder().varCharValue(expectedAuditDto.subjectId).build(),
+            Datum.builder().varCharValue(expectedAuditDto.subjectType).build(),
+            Datum.builder().varCharValue(expectedAuditDto.correlationId).build(),
+            Datum.builder().varCharValue(expectedAuditDto.who).build(),
+            Datum.builder().varCharValue(expectedAuditDto.service).build(),
+            Datum.builder().varCharValue(expectedAuditDto.details).build(),
+          ).build(),
+        ),
+      ).build()
+    private val getQueryExecutionRequest: GetQueryExecutionRequest =
+      GetQueryExecutionRequest.builder().queryExecutionId(queryExecutionId).build()
+    private val getQueryResultsRequest: GetQueryResultsRequest =
+      GetQueryResultsRequest.builder().queryExecutionId(queryExecutionId).build()
+    private val getQueryResultsResponse = GetQueryResultsResponse.builder().resultSet(resultSet).build()
+
+    @Test
+    fun getAuditEventsQueryResults() {
+      // Given
+      val authorities = listOf(SimpleGrantedAuthority(ROLE_QUERY_AUDIT_HMPPS_MANAGE_USERS))
+      SecurityContextHolder.getContext().authentication =
+        TestingAuthenticationToken("user", "credentials", authorities)
+
+      given(athenaClient.getQueryExecution(getQueryExecutionRequest)).willReturn(successfulQueryExecutionResponse)
+      given(athenaClient.getQueryResults(getQueryResultsRequest)).willReturn(getQueryResultsResponse)
+
+      // When
+      val digitalServicesAuditQueryResponse = auditAthenaClient.getAuditEventsQueryResults(queryExecutionId)
+
+      // Then
+      assertThat(digitalServicesAuditQueryResponse).isEqualTo(
+        AuditQueryResponse(
+          queryExecutionId = UUID.fromString(queryExecutionId),
+          queryState = QueryExecutionState.SUCCEEDED,
+          results = listOf(expectedAuditDto),
+          authorisedServices = listOf(HMPPS_MANAGE_USERS),
+        ),
+      )
+    }
+  }
+
+  @Nested
+  inner class AddPartitionForEvent {
+
+    @Test
+    fun `should issue correct ALTER TABLE ADD PARTITION query`() {
+      val expectedS3Location = "s3://${athenaProperties.s3BucketName}/year=2025/month=7/day=29/user=TESTUSER/"
+      val expectedQuery = """
+      ALTER TABLE $databaseName.$tableName
+      ADD IF NOT EXISTS PARTITION (year=2025, month=7, day=29, user='TESTUSER')
+      LOCATION '$expectedS3Location'
+      """.trimIndent()
+
+      auditAthenaClient.addPartitionForEvent(
+        AuditEvent(
+          what = "what",
+          `when` = LocalDateTime.of(LocalDate.of(2025, 7, 29), LocalTime.MIN).toInstant(ZoneOffset.UTC),
+          who = "TESTUSER",
+        ),
+        athenaProperties,
+      )
+
+      then(athenaClient).should().startQueryExecution(
+        StartQueryExecutionRequest.builder()
+          .queryString(expectedQuery)
+          .queryExecutionContext { it.database(athenaProperties.databaseName) }
+          .workGroup(athenaProperties.workGroupName)
+          .resultConfiguration { it.outputLocation(athenaProperties.outputLocation) }
+          .build(),
+      )
+    }
+
+    @Test
+    fun `should escape single quotes in user value to prevent SQL injection`() {
+      val escapedUser = "O''Reilly"
+      val expectedS3Location = "s3://${athenaProperties.s3BucketName}/year=2025/month=7/day=29/user=$escapedUser/"
+      val expectedQuery = """
+      ALTER TABLE $databaseName.$tableName
+      ADD IF NOT EXISTS PARTITION (year=2025, month=7, day=29, user='$escapedUser')
+      LOCATION '$expectedS3Location'
+      """.trimIndent()
+
+      auditAthenaClient.addPartitionForEvent(
+        AuditEvent(
+          what = "what",
+          `when` = LocalDateTime.of(LocalDate.of(2025, 7, 29), LocalTime.MIN).toInstant(ZoneOffset.UTC),
+          who = "O'Reilly",
+        ),
+        athenaProperties,
+      )
+
+      then(athenaClient).should().startQueryExecution(
+        StartQueryExecutionRequest.builder()
+          .queryString(expectedQuery)
+          .queryExecutionContext { it.database(athenaProperties.databaseName) }
+          .workGroup(athenaProperties.workGroupName)
+          .resultConfiguration { it.outputLocation(athenaProperties.outputLocation) }
+          .build(),
+      )
+    }
+  }
+
+  private fun columnInfo(name: String): ColumnInfo = ColumnInfo.builder().name(name).type("string").build()
+}

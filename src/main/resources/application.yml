@@ -1,10 +1,10 @@
 info.app:
-  name: Hmpps Audit Api
+  name: Hmpps PFS Web Analytics
   version: 1.0
 
 spring:
   application:
-    name: hmpps-audit-api
+    name: hmpps-pfs-web-analytics
   http:
     codecs:
       max-in-memory-size: 10MB

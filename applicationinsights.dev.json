@@ -1,6 +1,6 @@
 {
   "role": {
-    "name": "hmpps-audit-api"
+    "name": "hmpps-pfs-web-analytics"
   },
   "customDimensions": {
     "service.version": "${BUILD_NUMBER}"

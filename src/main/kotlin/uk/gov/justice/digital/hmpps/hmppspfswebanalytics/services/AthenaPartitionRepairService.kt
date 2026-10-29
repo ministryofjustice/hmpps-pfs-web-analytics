@@ -1,0 +1,53 @@
+package uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services
+
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.stereotype.Component
+import software.amazon.awssdk.services.athena.AthenaClient
+import software.amazon.awssdk.services.athena.model.QueryExecutionState.QUEUED
+import software.amazon.awssdk.services.athena.model.StartQueryExecutionRequest
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaPropertiesFactory
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryResponse
+import java.util.UUID
+
+@Component
+class AthenaPartitionRepairService(
+  private val athenaClient: AthenaClient,
+  private val athenaPropertiesFactory: AthenaPropertiesFactory,
+  @param:Value("\${hmpps.repository.saveToS3Bucket}") private val saveToS3Bucket: Boolean,
+) {
+
+  fun triggerRepairPartitions(auditEventType: AuditEventType): AuditQueryResponse {
+    val athenaProperties = athenaPropertiesFactory.getProperties(auditEventType)
+    val databaseName = athenaProperties.databaseName
+    val tableName = athenaProperties.tableName
+    val repairQuery = "MSCK REPAIR TABLE $databaseName.$tableName;"
+    val request = StartQueryExecutionRequest.builder()
+      .queryString(repairQuery)
+      .queryExecutionContext { it.database(databaseName) }
+      .workGroup(athenaProperties.workGroupName)
+      .resultConfiguration { it.outputLocation(athenaProperties.outputLocation) }
+      .build()
+    val startQueryExecutionResponse = athenaClient.startQueryExecution(request)
+    return AuditQueryResponse(
+      queryExecutionId = UUID.fromString(startQueryExecutionResponse.queryExecutionId()),
+      queryState = QUEUED,
+      authorisedServices = emptyList(),
+    )
+  }
+
+  @Scheduled(cron = "0 0 0 1 * *")
+  fun triggerRepairPartitions() {
+    if (saveToS3Bucket) {
+      triggerRepairPartitions(AuditEventType.STAFF)
+    }
+  }
+
+  @Scheduled(cron = "0 0 0 1 * *")
+  fun triggerPrisonerRepairPartitions() {
+    if (saveToS3Bucket) {
+      triggerRepairPartitions(AuditEventType.PRISONER)
+    }
+  }
+}

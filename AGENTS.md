@@ -4,7 +4,7 @@ Guidance for AI coding agents (and humans) working in this repository.
 
 ## Project overview
 
-`hmpps-audit-api` is a Kotlin/Spring Boot service that listens for `AuditEvent`
+`hmpps-pfs-web-analytics` is a Kotlin/Spring Boot service that listens for `AuditEvent`
 messages on an SQS queue, stores them in a Postgres database, and exposes
 REST endpoints to add and query audit events. It is part of the MoJ HMPPS
 estate and uses standard HMPPS Spring Boot tooling (`hmpps-kotlin-spring-boot-starter`,
@@ -22,7 +22,7 @@ estate and uses standard HMPPS Spring Boot tooling (`hmpps-kotlin-spring-boot-st
 
 ## Repository layout
 
-- `src/main/kotlin/uk/gov/justice/digital/hmpps/hmppsauditapi/` — application code
+- `hmppspfswebanalytics` — application code
   - `config/` — Spring configuration
   - `health/` — health indicators
   - `jpa/` + `jpa/model/` — JPA entities/repositories
@@ -52,7 +52,7 @@ TMPDIR=/private$TMPDIR docker compose up localstack
 
 Run a single test class/method:
 ```bash
-./gradlew test --tests "uk.gov.justice.digital.hmpps.hmppsauditapi.SomeClassTest"
+./gradlew test --tests "uk.gov.justice.digital.hmpps.hmppspfswebanalytics.SomeClassTest"
 ```
 
 Ktlint Gradle tasks are available, but do not run them in this repository.
@@ -60,7 +60,7 @@ Skip ktlint validation and formatting entirely.
 
 Run the app locally (dependencies via docker compose, app via Gradle):
 ```bash
-TMPDIR=/private$TMPDIR docker compose up --scale hmpps-audit-api=0
+TMPDIR=/private$TMPDIR docker compose up --scale hmpps-pfs-web-analytics=0
 ./gradlew bootRun --args='--spring.profiles.active=dev,localstack'
 ```
 

@@ -1,4 +1,4 @@
-# Environment specific values, override helm_deploy/hmpps-audit-api/values.yaml
+# Environment specific values, override helm_deploy/hmpps-pfs-web-analytics/values.yaml
 generic-service:
 
   replicaCount: 2

@@ -1,0 +1,33 @@
+package uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource
+
+import org.springframework.http.MediaType
+import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryResponse
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AthenaPartitionRepairService
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditAthenaClient
+import java.util.UUID
+
+@RestController
+@RequestMapping("/audit", produces = [MediaType.APPLICATION_JSON_VALUE])
+class PartitionRepairController(
+  private val athenaPartitionRepairService: AthenaPartitionRepairService,
+  private val auditAthenaClient: AuditAthenaClient,
+) {
+  @PreAuthorize("hasRole('ROLE_AUDIT')")
+  @PostMapping("/{auditEventType}/partition-repair")
+  fun triggerRepairPartitions(
+    @PathVariable auditEventType: AuditEventType,
+  ): AuditQueryResponse = athenaPartitionRepairService.triggerRepairPartitions(auditEventType)
+
+  @PreAuthorize("hasRole('ROLE_AUDIT')")
+  @GetMapping("/query/partition-repair/{queryExecutionId}")
+  fun getRepairPartitionsResults(
+    @PathVariable queryExecutionId: UUID,
+  ): AuditQueryResponse = auditAthenaClient.getQueryResults(queryExecutionId.toString())
+}

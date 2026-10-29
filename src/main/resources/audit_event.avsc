@@ -1,7 +1,7 @@
 {
   "type": "record",
   "name": "AuditEvent",
-  "namespace": "uk.gov.justice.digital.hmpps.hmppsauditapi.listeners",
+  "namespace": "uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners",
   "fields": [
     {"name": "id", "type": ["null", "string"], "default": null},
     {"name": "what", "type": "string"},

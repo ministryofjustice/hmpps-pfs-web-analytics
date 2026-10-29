@@ -1,6 +1,6 @@
 services:
-  hmpps-audit-api:
-    image: ghcr.io/ministryofjustice/hmpps-audit-api:latest
+  hmpps-pfs-web-analytics:
+    image: ghcr.io/ministryofjustice/hmpps-pfs-web-analytics:latest
     deploy:
       resources:
         limits:
@@ -11,7 +11,7 @@ services:
           memory: "512m"      # 512 MiB
 
     network_mode: "host"
-    container_name: hmpps-audit-api
+    container_name: hmpps-pfs-web-analytics
     depends_on:
       - audit-db
     ports:

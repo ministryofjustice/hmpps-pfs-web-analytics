@@ -1,1 +1,1 @@
-rootProject.name = "hmpps-audit-api"
+rootProject.name = "hmpps-pfs-web-analytics"

@@ -1,0 +1,154 @@
+package uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model
+
+import jakarta.validation.Validation
+import jakarta.validation.Validator
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import org.springframework.test.annotation.DirtiesContext
+import org.springframework.test.context.ActiveProfiles
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.IntegrationTest
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.S3TestConfig
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.endtoend.CommandLineProfilesResolver
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.STAFF
+import uk.gov.justice.hmpps.test.kotlin.auth.JwtAuthorisationHelper
+import java.time.LocalDate
+import java.util.stream.Stream
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(IntegrationTest.SqsConfig::class, JwtAuthorisationHelper::class, S3TestConfig::class)
+@ActiveProfiles(resolver = CommandLineProfilesResolver::class)
+@DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+class AuditQueryRequestValidatorTest {
+
+  private val validator: Validator = Validation.buildDefaultValidatorFactory().validator
+
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  @Nested
+  inner class AuditFilterCases {
+
+    @ParameterizedTest
+    @MethodSource("validBaseAuditFilterDto")
+    internal fun `should be valid`(auditQueryRequest: AuditQueryRequest) {
+      val violations = validator.validate(auditQueryRequest)
+      assertThat(violations).isEmpty()
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidBaseAuditFilterDto")
+    internal fun `should be invalid`(auditQueryRequest: AuditQueryRequest, expectedErrors: Map<String, String>) {
+      val actualErrors: Map<String, String> = validator.validate(auditQueryRequest).associate { it.propertyPath.toString() to it.message }
+      assertThat(actualErrors).containsExactlyInAnyOrderEntriesOf(expectedErrors)
+    }
+
+    private fun validBaseAuditFilterDto() = listOf(
+      AuditQueryRequest(
+        auditEventType = STAFF,
+        startDate = LocalDate.now().minusDays(1),
+        endDate = LocalDate.now(),
+        subjectId = "test-subject",
+        subjectType = "USER_ID",
+      ),
+      AuditQueryRequest(
+        auditEventType = STAFF,
+        startDate = LocalDate.now(),
+        subjectId = "test-subject",
+        subjectType = "USER_ID",
+      ),
+      AuditQueryRequest(
+        auditEventType = STAFF,
+        endDate = LocalDate.now(),
+        subjectId = "test-subject",
+        subjectType = "USER_ID",
+      ),
+      AuditQueryRequest(
+        auditEventType = STAFF,
+        startDate = LocalDate.now().minusDays(1),
+        endDate = LocalDate.now(),
+        who = "who",
+      ),
+      AuditQueryRequest(
+        auditEventType = STAFF,
+        startDate = LocalDate.now().minusDays(1),
+        who = "who",
+      ),
+      AuditQueryRequest(
+        auditEventType = STAFF,
+        endDate = LocalDate.now(),
+        who = "who",
+      ),
+    )
+
+    private fun invalidBaseAuditFilterDto() = Stream.of(
+      Arguments.of(
+        AuditQueryRequest(auditEventType = STAFF),
+        mapOf(
+          "startDate" to "startDate must be provided if endDate is null",
+          "endDate" to "endDate must be provided if startDate is null",
+          "who" to "If 'who' is null, then 'subjectId' and 'subjectType' must be populated",
+        ),
+      ),
+
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.now(),
+          endDate = LocalDate.now().plusDays(1),
+          who = "someone",
+        ),
+        mapOf("endDate" to "endDate must not be in the future"),
+      ),
+
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.now().plusDays(1),
+          who = "someone",
+        ),
+        mapOf("startDate" to "startDate must not be in the future"),
+      ),
+
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.now(),
+          endDate = LocalDate.now().minusDays(1),
+          who = "someone",
+        ),
+        mapOf("startDate" to "startDate must be before endDate"),
+      ),
+
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.now().minusDays(1),
+          endDate = LocalDate.now(),
+          subjectId = "test-subject",
+        ),
+        mapOf("subjectType" to "Both subjectId and subjectType must be populated together or left null"),
+      ),
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.now().minusDays(1),
+          endDate = LocalDate.now(),
+          subjectType = "PERSON",
+        ),
+        mapOf("subjectId" to "Both subjectId and subjectType must be populated together or left null"),
+      ),
+      Arguments.of(
+        AuditQueryRequest(
+          auditEventType = STAFF,
+          startDate = LocalDate.now().minusDays(1),
+          endDate = LocalDate.now(),
+        ),
+        mapOf("who" to "If 'who' is null, then 'subjectId' and 'subjectType' must be populated"),
+      ),
+    )
+  }
+}

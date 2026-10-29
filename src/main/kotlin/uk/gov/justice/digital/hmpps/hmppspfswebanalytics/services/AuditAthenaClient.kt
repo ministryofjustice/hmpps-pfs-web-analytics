@@ -1,0 +1,228 @@
+package uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services
+
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.security.core.GrantedAuthority
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.stereotype.Service
+import software.amazon.awssdk.services.athena.AthenaClient
+import software.amazon.awssdk.services.athena.model.GetQueryExecutionRequest
+import software.amazon.awssdk.services.athena.model.GetQueryResultsRequest
+import software.amazon.awssdk.services.athena.model.QueryExecutionState
+import software.amazon.awssdk.services.athena.model.StartQueryExecutionRequest
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaProperties
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaPropertiesFactory
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEvent
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryRequest
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryResponse
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditDto
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
+
+private const val AUTHORISED_SERVICE_ROLE_PREFIX = "ROLE_QUERY_AUDIT__"
+
+@Service
+class AuditAthenaClient(
+  private val athenaClient: AthenaClient,
+  private val athenaPropertiesFactory: AthenaPropertiesFactory,
+  private val clock: Clock,
+  @Value("\${hmpps.audit.queriesStartDate}") private val queriesStartDate: LocalDate,
+) {
+
+  fun triggerQuery(filter: AuditQueryRequest, auditEventType: AuditEventType): AuditQueryResponse {
+    if (filter.startDate == null) {
+      filter.startDate = queriesStartDate
+    }
+    if (filter.endDate == null) {
+      filter.endDate = LocalDate.now(clock)
+    }
+    val authorisedServices = getAuthorisedServices()
+    val (query, executionParameters) = buildAthenaQuery(filter, authorisedServices, auditEventType)
+    val queryExecutionId = startAthenaQuery(query, executionParameters, auditEventType)
+
+    return AuditQueryResponse(
+      queryExecutionId = UUID.fromString(queryExecutionId),
+      queryState = QueryExecutionState.QUEUED,
+      authorisedServices = authorisedServices,
+    )
+  }
+
+  fun getAuditEventsQueryResults(queryExecutionId: String): AuditQueryResponse {
+    val response = getQueryResults(queryExecutionId)
+    if (response.queryState == QueryExecutionState.SUCCEEDED) {
+      response.results = fetchQueryResults(queryExecutionId)
+    }
+    return response
+  }
+
+  fun getQueryResults(queryExecutionId: String): AuditQueryResponse {
+    val queryExecution = athenaClient.getQueryExecution(GetQueryExecutionRequest.builder().queryExecutionId(queryExecutionId).build()).queryExecution()
+    val queryState = queryExecution.status().state()
+    val response = AuditQueryResponse(
+      queryExecutionId = UUID.fromString(queryExecutionId),
+      queryState = queryState,
+      authorisedServices = getAuthorisedServices(),
+      executionTimeInMillis = queryExecution.statistics().totalExecutionTimeInMillis(),
+    )
+    return response
+  }
+
+  fun addPartitionForEvent(auditEvent: AuditEvent, athenaProperties: AthenaProperties) {
+    val whenDateTime = auditEvent.`when`.atZone(ZoneId.systemDefault()).toLocalDateTime()
+    val year = whenDateTime.year
+    val month = whenDateTime.monthValue
+    val day = whenDateTime.dayOfMonth
+    // Escape SQL special characters to prevent injection in this DDL statement,
+    // which cannot use Athena parameterised queries.
+    val user = escapeSql(auditEvent.who ?: "null")
+
+    val partitionS3Path = "s3://${athenaProperties.s3BucketName}/year=$year/month=$month/day=$day/user=$user/"
+
+    val alterQuery = """
+    ALTER TABLE ${athenaProperties.databaseName}.${athenaProperties.tableName}
+    ADD IF NOT EXISTS PARTITION (year=$year, month=$month, day=$day, user='$user')
+    LOCATION '$partitionS3Path'
+    """.trimIndent()
+
+    val request = StartQueryExecutionRequest.builder()
+      .queryString(alterQuery)
+      .queryExecutionContext { it.database(athenaProperties.databaseName) }
+      .workGroup(athenaProperties.workGroupName)
+      .resultConfiguration { it.outputLocation(athenaProperties.outputLocation) }
+      .build()
+
+    athenaClient.startQueryExecution(request)
+  }
+
+  private fun escapeSql(value: String): String = value.replace("'", "''")
+
+  private fun buildAthenaQuery(filter: AuditQueryRequest, services: List<String>, auditEventType: AuditEventType): Pair<String, List<String>> {
+    val athenaProperties = athenaPropertiesFactory.getProperties(auditEventType)
+    val conditions = mutableListOf<String>()
+    val executionParameters = mutableListOf<String>()
+    val databaseName = athenaProperties.databaseName
+    val tableName = athenaProperties.tableName
+
+    if (services.isEmpty()) {
+      return Pair("SELECT * FROM $databaseName.$tableName WHERE 1 = 0;", emptyList())
+    }
+
+    // Partition filtering: safe — values are integer fields from a LocalDate, not user input.
+    val partitionConditions = buildPartitionDateConditions(filter.startDate!!, filter.endDate!!)
+    conditions.add("(${partitionConditions.joinToString(" OR ")})")
+
+    // Date range: safe — LocalDate.toString() always produces a fixed YYYY-MM-DD literal,
+    // and the values originate from validated LocalDate objects, not raw user strings.
+    val startDateStr = filter.startDate.toString()
+    val endDateStr = filter.endDate.toString()
+    conditions.add("DATE(from_iso8601_timestamp(\"when\")) BETWEEN DATE '$startDateStr' AND DATE '$endDateStr'")
+
+    // User-supplied string values use Athena parameterised ? placeholders so they are never
+    // interpolated into the query string, eliminating the SQL-injection risk.
+    filter.who?.let {
+      conditions.add("user = ?")
+      executionParameters.add(it)
+    }
+    filter.subjectId?.let {
+      conditions.add("subjectId = ?")
+      executionParameters.add(it)
+    }
+    filter.subjectType?.let {
+      conditions.add("subjectType = ?")
+      executionParameters.add(it)
+    }
+
+    if (userDoesNotHaveAccessToAllServices(services)) {
+      val placeholders = services.joinToString(", ") { "?" }
+      conditions.add("service IN ($placeholders)")
+      executionParameters.addAll(services)
+    }
+
+    val whereClause = "WHERE ${conditions.joinToString(" AND ")}"
+    val query = "SELECT * FROM $databaseName.$tableName $whereClause;"
+
+    return Pair(query, executionParameters)
+  }
+
+  private fun buildPartitionDateConditions(startDate: LocalDate, endDate: LocalDate): List<String> {
+    require(!endDate.isBefore(startDate)) { "End date must be on or after start date" }
+
+    return generateSequence(startDate) { it.plusDays(1) }
+      .takeWhile { !it.isAfter(endDate) }
+      .map { date ->
+        "(year = '${date.year}' AND month = '${date.monthValue}' AND day = '${date.dayOfMonth}')"
+      }
+      .toList()
+  }
+
+  private fun startAthenaQuery(query: String, executionParameters: List<String>, auditEventType: AuditEventType): String {
+    val athenaProperties = athenaPropertiesFactory.getProperties(auditEventType)
+    val requestBuilder = StartQueryExecutionRequest.builder()
+      .queryString(query)
+      .queryExecutionContext { it.database(athenaProperties.databaseName) }
+      .workGroup(athenaProperties.workGroupName)
+      .resultConfiguration { it.outputLocation(athenaProperties.outputLocation) }
+
+    if (executionParameters.isNotEmpty()) {
+      requestBuilder.executionParameters(executionParameters)
+    }
+
+    val response = athenaClient.startQueryExecution(requestBuilder.build())
+    return response.queryExecutionId()
+  }
+
+  private fun fetchQueryResults(queryExecutionId: String): List<AuditDto> {
+    val request = GetQueryResultsRequest.builder()
+      .queryExecutionId(queryExecutionId)
+      .build()
+
+    val results = mutableListOf<AuditDto>()
+    var nextToken: String? = null
+
+    do {
+      val response = athenaClient.getQueryResults(
+        request.toBuilder().nextToken(nextToken).build(),
+      )
+
+      val columnNames = response.resultSet().resultSetMetadata().columnInfo().map { it.name() }
+
+      response.resultSet().rows().drop(1).forEach { row ->
+        val values = row.data().map { it.varCharValue() ?: "" }
+        val resultMap = columnNames.zip(values).toMap()
+
+        val staffAuditDto = AuditDto(
+          id = UUID.fromString(resultMap["id"]),
+          what = resultMap["what"] ?: "",
+          `when` = Instant.parse(resultMap["when"] ?: throw IllegalArgumentException("Missing timestamp")),
+          operationId = resultMap["operationid"],
+          subjectId = resultMap["subjectid"],
+          subjectType = resultMap["subjecttype"],
+          correlationId = resultMap["correlationid"],
+          who = resultMap["who"],
+          service = resultMap["service"],
+          details = resultMap["details"],
+        )
+
+        results.add(staffAuditDto)
+      }
+
+      nextToken = response.nextToken()
+    } while (nextToken != null)
+
+    return results
+  }
+
+  private fun getAuthorisedServices(): List<String> {
+    val authentication = SecurityContextHolder.getContext().authentication
+    return authentication?.authorities
+      ?.map(GrantedAuthority::getAuthority)
+      ?.filter { it!!.startsWith(AUTHORISED_SERVICE_ROLE_PREFIX) }
+      ?.map { it!!.removePrefix(AUTHORISED_SERVICE_ROLE_PREFIX).lowercase().replace('_', '-') }
+      ?: emptyList()
+  }
+
+  private fun userDoesNotHaveAccessToAllServices(services: List<String>) = !services.any { it.equals("all-services", ignoreCase = true) }
+}
