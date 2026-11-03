@@ -19,7 +19,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/audit,db/audit_postgres
-    schemas: staff,prisoner,person_on_probation
+    schemas: staff,prisoner
     default-schema: staff
 
   security:
@@ -119,8 +119,7 @@ hmpps:
         asyncQueueClient: true
       auditusersqueue:
         asyncQueueClient: true
-      persononprobationqueue:
-        asyncQueueClient: true
+
   repository:
     saveToS3Bucket: ${SAVE_TO_S3_BUCKET}
   audit:

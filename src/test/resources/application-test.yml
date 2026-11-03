@@ -38,10 +38,6 @@ hmpps.sqs:
       queueName: ${random.uuid}
       asyncQueueClient: true
       dlqName: ${random.uuid}
-    persononprobationauditqueue:
-      queueName: ${random.uuid}
-      asyncQueueClient: true
-      dlqName: ${random.uuid}
 
 spring:
   datasource:

@@ -17,7 +17,6 @@ import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.S3TestConfi
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.endtoend.CommandLineProfilesResolver
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditQueueService
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.PersonOnProbationAuditService
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.PrisonerAuditService
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.StaffAuditService
 import uk.gov.justice.hmpps.sqs.HmppsQueueFactory
@@ -40,9 +39,6 @@ abstract class IntegrationTest {
 
   @MockitoSpyBean
   protected lateinit var prisonerAuditService: PrisonerAuditService
-
-  @MockitoSpyBean
-  protected lateinit var personOnProbationAuditService: PersonOnProbationAuditService
 
   @MockitoSpyBean
   protected lateinit var auditQueueService: AuditQueueService
@@ -70,10 +66,6 @@ abstract class IntegrationTest {
     hmppsQueueService.findByQueueId("prisonerauditqueue") ?: throw MissingQueueException("HmppsQueue prisonerauditqueue not found")
   }
 
-  protected val personOnProbationAuditQueueConfig by lazy {
-    hmppsQueueService.findByQueueId("persononprobationauditqueue") ?: throw MissingQueueException("HmppsQueue persononprobationauditqueue not found")
-  }
-
   protected val auditUsersQueueConfig by lazy {
     hmppsQueueService.findByQueueId("auditusersqueue") ?: throw MissingQueueException("HmppsQueue auditusersqueue not found")
   }
@@ -85,10 +77,6 @@ abstract class IntegrationTest {
   protected val awsSqsPrisonerAuditDlqClient by lazy { prisonerAuditQueueConfig.sqsDlqClient as SqsAsyncClient }
   protected val awsSqsPrisonerAuditUrl by lazy { prisonerAuditQueueConfig.queueUrl }
   protected val awsSqsPrisonerAuditDlqUrl by lazy { prisonerAuditQueueConfig.dlqUrl as String }
-
-  protected val awsSqsPersonOnProbationAuditDlqClient by lazy { personOnProbationAuditQueueConfig.sqsDlqClient as SqsAsyncClient }
-  protected val awsSqsPersonOnProbationAuditUrl by lazy { personOnProbationAuditQueueConfig.queueUrl }
-  protected val awsSqsPersonOnProbationAuditDlqUrl by lazy { personOnProbationAuditQueueConfig.dlqUrl as String }
 
   protected val staffAthenaProperties = AthenaProperties(
     auditEventType = AuditEventType.STAFF,
@@ -106,15 +94,6 @@ abstract class IntegrationTest {
     tableName = "the-prisoner-table",
     workGroupName = "the-prisoner-workgroup",
     outputLocation = "the-prisoner-location",
-  )
-
-  protected val personOnProbationAthenaProperties = AthenaProperties(
-    auditEventType = AuditEventType.PERSON_ON_PROBATION,
-    s3BucketName = "=",
-    databaseName = "",
-    tableName = "",
-    workGroupName = "",
-    outputLocation = "",
   )
 
   @MockitoSpyBean
@@ -141,16 +120,6 @@ abstract class IntegrationTest {
       val config = queues["prisonerauditqueue"]
         ?: throw MissingQueueException("HmppsSqsProperties config for prisonerauditqueue not found")
       hmppsQueueFactory.createSqsAsyncClient(config, hmppsSqsProperties, outboundPrisonerAuditQueueSqsDlqClient)
-    }
-
-    @Bean("persononprobationauditqueue-sqs-client")
-    fun outboundPersonOnProbationAuditQueueSqsClient(
-      hmppsSqsProperties: HmppsSqsProperties,
-      @Qualifier("persononprobationauditqueue-sqs-dlq-client") outboundPersonOnProbationAuditQueueSqsDlqClient: SqsAsyncClient,
-    ): SqsAsyncClient = with(hmppsSqsProperties) {
-      val config = queues["persononprobationauditqueue"]
-        ?: throw MissingQueueException("HmppsSqsProperties config for persononprobationauditqueue not found")
-      hmppsQueueFactory.createSqsAsyncClient(config, hmppsSqsProperties, outboundPersonOnProbationAuditQueueSqsDlqClient)
     }
 
     @Bean("auditusersqueue-sqs-client")

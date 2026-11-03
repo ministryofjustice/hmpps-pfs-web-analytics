@@ -41,17 +41,6 @@ class AthenaPropertiesConfig(
     workGroupName = prisonerWorkGroupName,
     outputLocation = prisonerOutputLocation,
   )
-
-  @Bean
-  @Qualifier("personOnProbationAthenaProperties")
-  fun personOnProbationProperties(): AthenaProperties = AthenaProperties(
-    auditEventType = AuditEventType.PERSON_ON_PROBATION,
-    s3BucketName = "",
-    databaseName = "",
-    tableName = "",
-    workGroupName = "",
-    outputLocation = "",
-  )
 }
 
 data class AthenaProperties(
