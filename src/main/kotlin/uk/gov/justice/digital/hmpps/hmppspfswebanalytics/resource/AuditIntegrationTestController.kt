@@ -39,9 +39,7 @@ class AuditIntegrationTestController(
   @PreAuthorize("hasRole('ROLE_AUDIT_INTEGRATION_TEST')")
   fun createAuditEvent(@PathVariable auditEventType: AuditEventType): AuditEvent {
     val createdAuditEvent = createTestAuditEvent()
-    if (auditEventType == AuditEventType.STAFF) {
-      auditQueueService.sendAuditEvent(createdAuditEvent)
-    } else if (auditEventType == AuditEventType.PRISONER) {
+    if (auditEventType == AuditEventType.PRISONER) {
       auditQueueService.sendPrisonerAuditEvent(createdAuditEvent)
     }
     Thread.sleep(10000) // Time needed for event to be processed by SQS

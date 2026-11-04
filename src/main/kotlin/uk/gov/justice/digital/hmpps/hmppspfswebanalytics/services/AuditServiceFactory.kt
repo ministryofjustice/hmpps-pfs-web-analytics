@@ -6,10 +6,8 @@ import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEv
 @Component
 class AuditServiceFactory(
   private val prisonerAuditService: PrisonerAuditService,
-  private val staffAuditService: StaffAuditService,
 ) {
   fun getAuditService(auditEventType: AuditEventType): AuditServiceInterface = when (auditEventType) {
     AuditEventType.PRISONER -> prisonerAuditService
-    AuditEventType.STAFF -> staffAuditService
   }
 }

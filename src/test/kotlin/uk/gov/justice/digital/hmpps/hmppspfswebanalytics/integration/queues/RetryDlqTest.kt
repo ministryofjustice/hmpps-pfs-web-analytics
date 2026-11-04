@@ -10,7 +10,7 @@ import org.mockito.kotlin.verify
 import org.springframework.http.MediaType
 import org.springframework.test.context.TestPropertySource
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.StaffAuditEvent
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.PrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.QueueListenerIntegrationTest
 import java.util.concurrent.TimeUnit
 
@@ -22,7 +22,7 @@ class RetryDlqTest : QueueListenerIntegrationTest() {
     @Test
     fun `should fail if no token`() {
       webTestClient.put()
-        .uri("/queue-admin/retry-dlq/${auditQueueConfig.dlqName}")
+        .uri("/queue-admin/retry-dlq/${prisonerAuditQueueConfig.dlqName}")
         .contentType(MediaType.APPLICATION_JSON)
         .exchange()
         .expectStatus().isUnauthorized
@@ -31,7 +31,7 @@ class RetryDlqTest : QueueListenerIntegrationTest() {
     @Test
     fun `should fail if wrong role`() {
       webTestClient.put()
-        .uri("/queue-admin/retry-dlq/${auditQueueConfig.dlqName}")
+        .uri("/queue-admin/retry-dlq/${prisonerAuditQueueConfig.dlqName}")
         .headers(setAuthorisation(roles = listOf("ROLE_WRONG")))
         .contentType(MediaType.APPLICATION_JSON)
         .exchange()
@@ -41,7 +41,7 @@ class RetryDlqTest : QueueListenerIntegrationTest() {
     @Test
     fun `should fail if using default rather than custom role`() {
       webTestClient.put()
-        .uri("/queue-admin/retry-dlq/${auditQueueConfig.dlqName}")
+        .uri("/queue-admin/retry-dlq/${prisonerAuditQueueConfig.dlqName}")
         .headers(setAuthorisation(roles = listOf("ROLE_QUEUE_ADMIN")))
         .contentType(MediaType.APPLICATION_JSON)
         .exchange()
@@ -70,23 +70,23 @@ class RetryDlqTest : QueueListenerIntegrationTest() {
       "details": "{ \"offenderId\": \"99\"}"
     }
   """
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnQueue() } matches { it == 0 }
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnDlq() } matches { it == 0 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 0 }
       awsSqsClient.sendMessage(
-        SendMessageRequest.builder().queueUrl(awsSqsDlqUrl).messageBody(message).build(),
+        SendMessageRequest.builder().queueUrl(prisonerAuditDlqUrl).messageBody(message).build(),
       )
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnDlq() } matches { it == 1 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 1 }
 
       webTestClient.put()
-        .uri("/queue-admin/retry-dlq/${auditQueueConfig.dlqName}")
+        .uri("/queue-admin/retry-dlq/${prisonerAuditQueueConfig.dlqName}")
         .headers(setAuthorisation(roles = listOf("ROLE_AUDIT_API_QUEUE_ADMIN"), scopes = listOf("write")))
         .contentType(MediaType.APPLICATION_JSON)
         .exchange()
         .expectStatus().isOk
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnDlq() } matches { it == 0 }
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnQueue() } matches { it == 0 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 0 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
 
-      verify(staffAuditRepository).save(any<StaffAuditEvent>())
+      verify(prisonerAuditRepository).save(any<PrisonerAuditEvent>())
     }
   }
 
@@ -105,22 +105,22 @@ class RetryDlqTest : QueueListenerIntegrationTest() {
       "details": "{ \"offenderId\": \"99\"}"
     }
   """
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnQueue() } matches { it == 0 }
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnDlq() } matches { it == 0 }
-      awsSqsDlqClient.sendMessage(
-        SendMessageRequest.builder().queueUrl(awsSqsDlqUrl).messageBody(message).build(),
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 0 }
+      prisonerAuditSqsDlqClient.sendMessage(
+        SendMessageRequest.builder().queueUrl(prisonerAuditDlqUrl).messageBody(message).build(),
       )
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnDlq() } matches { it == 1 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 1 }
 
       webTestClient.put()
         .uri("/queue-admin/retry-all-dlqs")
         .contentType(MediaType.APPLICATION_JSON)
         .exchange()
         .expectStatus().isOk
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnDlq() } matches { it == 0 }
-      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnQueue() } matches { it == 0 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 0 }
+      await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
 
-      verify(staffAuditRepository).save(any<StaffAuditEvent>())
+      verify(prisonerAuditRepository).save(any<PrisonerAuditEvent>())
     }
   }
 }

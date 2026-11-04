@@ -15,7 +15,7 @@ import org.springframework.test.context.ActiveProfiles
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.IntegrationTest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.S3TestConfig
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.endtoend.CommandLineProfilesResolver
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.STAFF
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.PRISONER
 import uk.gov.justice.hmpps.test.kotlin.auth.JwtAuthorisationHelper
 import java.time.LocalDate
 import java.util.stream.Stream
@@ -48,37 +48,37 @@ class AuditQueryRequestValidatorTest {
 
     private fun validBaseAuditFilterDto() = listOf(
       AuditQueryRequest(
-        auditEventType = STAFF,
+        auditEventType = PRISONER,
         startDate = LocalDate.now().minusDays(1),
         endDate = LocalDate.now(),
         subjectId = "test-subject",
         subjectType = "USER_ID",
       ),
       AuditQueryRequest(
-        auditEventType = STAFF,
+        auditEventType = PRISONER,
         startDate = LocalDate.now(),
         subjectId = "test-subject",
         subjectType = "USER_ID",
       ),
       AuditQueryRequest(
-        auditEventType = STAFF,
+        auditEventType = PRISONER,
         endDate = LocalDate.now(),
         subjectId = "test-subject",
         subjectType = "USER_ID",
       ),
       AuditQueryRequest(
-        auditEventType = STAFF,
+        auditEventType = PRISONER,
         startDate = LocalDate.now().minusDays(1),
         endDate = LocalDate.now(),
         who = "who",
       ),
       AuditQueryRequest(
-        auditEventType = STAFF,
+        auditEventType = PRISONER,
         startDate = LocalDate.now().minusDays(1),
         who = "who",
       ),
       AuditQueryRequest(
-        auditEventType = STAFF,
+        auditEventType = PRISONER,
         endDate = LocalDate.now(),
         who = "who",
       ),
@@ -86,7 +86,7 @@ class AuditQueryRequestValidatorTest {
 
     private fun invalidBaseAuditFilterDto() = Stream.of(
       Arguments.of(
-        AuditQueryRequest(auditEventType = STAFF),
+        AuditQueryRequest(auditEventType = PRISONER),
         mapOf(
           "startDate" to "startDate must be provided if endDate is null",
           "endDate" to "endDate must be provided if startDate is null",
@@ -96,7 +96,7 @@ class AuditQueryRequestValidatorTest {
 
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.now(),
           endDate = LocalDate.now().plusDays(1),
           who = "someone",
@@ -106,7 +106,7 @@ class AuditQueryRequestValidatorTest {
 
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.now().plusDays(1),
           who = "someone",
         ),
@@ -115,7 +115,7 @@ class AuditQueryRequestValidatorTest {
 
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.now(),
           endDate = LocalDate.now().minusDays(1),
           who = "someone",
@@ -125,7 +125,7 @@ class AuditQueryRequestValidatorTest {
 
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.now().minusDays(1),
           endDate = LocalDate.now(),
           subjectId = "test-subject",
@@ -134,7 +134,7 @@ class AuditQueryRequestValidatorTest {
       ),
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.now().minusDays(1),
           endDate = LocalDate.now(),
           subjectType = "PERSON",
@@ -143,7 +143,7 @@ class AuditQueryRequestValidatorTest {
       ),
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.now().minusDays(1),
           endDate = LocalDate.now(),
         ),

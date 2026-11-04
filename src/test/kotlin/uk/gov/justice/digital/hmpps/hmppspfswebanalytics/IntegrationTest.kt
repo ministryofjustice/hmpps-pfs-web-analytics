@@ -18,7 +18,6 @@ import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.endtoend.Co
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditQueueService
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.PrisonerAuditService
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.StaffAuditService
 import uk.gov.justice.hmpps.sqs.HmppsQueueFactory
 import uk.gov.justice.hmpps.sqs.HmppsQueueService
 import uk.gov.justice.hmpps.sqs.HmppsSqsProperties
@@ -33,9 +32,6 @@ import uk.gov.justice.hmpps.test.kotlin.auth.JwtAuthorisationHelper
 abstract class IntegrationTest {
   @Autowired
   lateinit var webTestClient: WebTestClient
-
-  @MockitoSpyBean
-  protected lateinit var staffAuditService: StaffAuditService
 
   @MockitoSpyBean
   protected lateinit var prisonerAuditService: PrisonerAuditService
@@ -58,10 +54,6 @@ abstract class IntegrationTest {
   @Autowired
   protected lateinit var hmppsQueueService: HmppsQueueService
 
-  protected val auditQueueConfig by lazy {
-    hmppsQueueService.findByQueueId("auditqueue") ?: throw MissingQueueException("HmppsQueue auditqueue not found")
-  }
-
   protected val prisonerAuditQueueConfig by lazy {
     hmppsQueueService.findByQueueId("prisonerauditqueue") ?: throw MissingQueueException("HmppsQueue prisonerauditqueue not found")
   }
@@ -70,22 +62,9 @@ abstract class IntegrationTest {
     hmppsQueueService.findByQueueId("auditusersqueue") ?: throw MissingQueueException("HmppsQueue auditusersqueue not found")
   }
 
-  protected val awsSqsDlqClient by lazy { auditQueueConfig.sqsDlqClient as SqsAsyncClient }
-  protected val awsSqsUrl by lazy { auditQueueConfig.queueUrl }
-  protected val awsSqsDlqUrl by lazy { auditQueueConfig.dlqUrl as String }
-
   protected val awsSqsPrisonerAuditDlqClient by lazy { prisonerAuditQueueConfig.sqsDlqClient as SqsAsyncClient }
   protected val awsSqsPrisonerAuditUrl by lazy { prisonerAuditQueueConfig.queueUrl }
   protected val awsSqsPrisonerAuditDlqUrl by lazy { prisonerAuditQueueConfig.dlqUrl as String }
-
-  protected val staffAthenaProperties = AthenaProperties(
-    auditEventType = AuditEventType.STAFF,
-    s3BucketName = "hmpps-audit-bucket",
-    databaseName = "the-database",
-    tableName = "the-table",
-    workGroupName = "the-workgroup",
-    outputLocation = "the-location",
-  )
 
   protected val prisonerAthenaProperties = AthenaProperties(
     auditEventType = AuditEventType.PRISONER,
@@ -97,21 +76,11 @@ abstract class IntegrationTest {
   )
 
   @MockitoSpyBean
-  @Qualifier("auditqueue-sqs-client")
+  @Qualifier("prisonerauditqueue-sqs-client")
   protected lateinit var awsSqsClient: SqsAsyncClient
 
   @TestConfiguration
   class SqsConfig(private val hmppsQueueFactory: HmppsQueueFactory) {
-    @Bean("auditqueue-sqs-client")
-    fun outboundQueueSqsClient(
-      hmppsSqsProperties: HmppsSqsProperties,
-      @Qualifier("auditqueue-sqs-dlq-client") outboundQueueSqsDlqClient: SqsAsyncClient,
-    ): SqsAsyncClient = with(hmppsSqsProperties) {
-      val config = queues["auditqueue"]
-        ?: throw MissingQueueException("HmppsSqsProperties config for auditqueue not found")
-      hmppsQueueFactory.createSqsAsyncClient(config, hmppsSqsProperties, outboundQueueSqsDlqClient)
-    }
-
     @Bean("prisonerauditqueue-sqs-client")
     fun outboundPrisonerAuditQueueSqsClient(
       hmppsSqsProperties: HmppsSqsProperties,
