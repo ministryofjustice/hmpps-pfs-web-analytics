@@ -18,12 +18,6 @@ class AuditQueueService(
   private val securityUserContext: SecurityUserContext,
   private val objectMapper: ObjectMapper,
 ) {
-  private val auditQueue by lazy {
-    hmppsQueueService.findByQueueId("auditqueue") ?: throw RuntimeException("Queue with name audit doesn't exist")
-  }
-  private val auditQueueUrl by lazy { auditQueue.queueUrl }
-  private val auditSqsClient by lazy { auditQueue.sqsClient }
-
   private val prisonerAuditQueue by lazy {
     hmppsQueueService.findByQueueId("prisonerauditqueue") ?: throw RuntimeException("Queue with name audit doesn't exist")
   }
@@ -34,29 +28,9 @@ class AuditQueueService(
     val log: Logger = LoggerFactory.getLogger(this::class.java)
   }
 
-  fun sendAuditAuditEvent(what: String, details: Any) {
-    val auditEvent = AuditEvent(
-      what = what,
-      who = securityUserContext.principal,
-      service = serviceName,
-      details = objectMapper.writeValueAsString(details),
-    )
-    sendAuditEvent(auditEvent)
-  }
-
-  fun sendAuditEvent(auditEvent: AuditEvent) {
-    log.debug("Audit queue name {} {} {}", auditQueueUrl, auditEvent, auditSqsClient)
-    auditSqsClient.sendMessage(
-      SendMessageRequest.builder()
-        .queueUrl(auditQueueUrl)
-        .messageBody(objectMapper.writeValueAsString(auditEvent))
-        .build(),
-    )
-  }
-
   fun sendPrisonerAuditEvent(auditEvent: AuditEvent) {
     log.debug("Prisoner Audit queue name {} {} {}", prisonerAuditQueueUrl, auditEvent, prisonerAuditSqsClient)
-    auditSqsClient.sendMessage(
+    prisonerAuditSqsClient.sendMessage(
       SendMessageRequest.builder()
         .queueUrl(prisonerAuditQueueUrl)
         .messageBody(objectMapper.writeValueAsString(auditEvent))

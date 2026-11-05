@@ -39,7 +39,7 @@ For local development of this service, to run all the dependencies (including [L
 
 
 ```bash
-TMPDIR=/private$TMPDIR  docker compose up --scale hmpps-audit-api=0
+TMPDIR=/private$TMPDIR  docker compose up --scale hmpps-pfs-web-analytics=0
 ```
 
 And then using gradle:

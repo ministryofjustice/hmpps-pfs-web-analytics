@@ -193,7 +193,7 @@ class AuditAthenaClient(
         val values = row.data().map { it.varCharValue() ?: "" }
         val resultMap = columnNames.zip(values).toMap()
 
-        val staffAuditDto = AuditDto(
+        val auditDto = AuditDto(
           id = UUID.fromString(resultMap["id"]),
           what = resultMap["what"] ?: "",
           `when` = Instant.parse(resultMap["when"] ?: throw IllegalArgumentException("Missing timestamp")),
@@ -206,7 +206,7 @@ class AuditAthenaClient(
           details = resultMap["details"],
         )
 
-        results.add(staffAuditDto)
+        results.add(auditDto)
       }
 
       nextToken = response.nextToken()

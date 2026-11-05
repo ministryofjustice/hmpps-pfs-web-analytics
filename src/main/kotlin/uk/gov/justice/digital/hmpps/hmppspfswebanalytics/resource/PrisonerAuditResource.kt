@@ -25,7 +25,6 @@ import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditFilterDto
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryRequest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryResponse
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditDto
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditType
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.swagger.StandardApiResponses
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditQueueService
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.PrisonerAuditService
@@ -50,13 +49,7 @@ class PrisonerAuditResource(
     pageable: Pageable = Pageable.ofSize(100),
     @RequestBody @Valid
     auditFilterDto: AuditFilterDto,
-  ): Page<AuditDto> {
-    auditQueueService.sendAuditAuditEvent(
-      AuditType.AUDIT_GET_ALL_PAGED.name,
-      auditFilterDto,
-    )
-    return prisonerAuditService.findPage(pageable, auditFilterDto)
-  }
+  ): Page<AuditDto> = prisonerAuditService.findPage(pageable, auditFilterDto)
 
   @Hidden
   @Deprecated("Prisoner Audit events should be sent via audit queue")
@@ -89,10 +82,6 @@ class PrisonerAuditResource(
     if (auditFilterDto.auditEventType != AuditEventType.PRISONER) {
       throw EventTypeException("Incorrect event type used") as Throwable
     }
-    auditQueueService.sendAuditAuditEvent(
-      AuditType.AUDIT_GET_BY_USER.name,
-      auditFilterDto,
-    )
     return prisonerAuditService.triggerQuery(auditFilterDto, AuditEventType.PRISONER)
   }
 
@@ -106,13 +95,7 @@ class PrisonerAuditResource(
   @GetMapping("/prisoner/query/{queryExecutionId}")
   fun getQueryResults(
     @PathVariable queryExecutionId: UUID,
-  ): AuditQueryResponse {
-    auditQueueService.sendAuditAuditEvent(
-      AuditType.AUDIT_GET_BY_USER.name,
-      queryExecutionId,
-    )
-    return prisonerAuditService.getQueryResults(queryExecutionId.toString())
-  }
+  ): AuditQueryResponse = prisonerAuditService.getQueryResults(queryExecutionId.toString())
 
   private fun String.traceId(): String? {
     val traceParentElements = split("-")

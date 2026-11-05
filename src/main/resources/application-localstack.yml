@@ -4,10 +4,6 @@ graceful:
 aws:
   provider: localstack
   athena:
-    database: database_name
-    table: table
-    workgroup: workgroup
-    outputLocation: output-location
     prisonerDatabase: prisoner-database
     prisonerTable: prisoner-table
     prisonerWorkgroup: prisonerWorkgroup
@@ -19,14 +15,6 @@ aws:
 hmpps.sqs:
   provider: localstack
   queues:
-    auditqueue:
-      queueName: mainQueue
-      asyncQueueClient: true
-      dlqName: mainDlq
-    auditusersqueue:
-      queueName: auditUsersQueue
-      asyncQueueClient: true
-      dlqName: auditUsersDlq
     prisonerauditqueue:
       queueName: prisonerQueue
       asyncQueueClient: true

@@ -19,8 +19,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/audit,db/audit_postgres
-    schemas: staff,prisoner
-    default-schema: staff
+    schemas: prisoner
+    default-schema: prisoner
 
   security:
     oauth2:
@@ -89,10 +89,6 @@ aws:
   provider: aws
   region: eu-west-2
   athena:
-    database: ${HMPPS_GLUE_DATABASE_NAME}
-    table: ${HMPPS_GLUE_TABLE_NAME}
-    workgroup: ${HMPPS_ATHENA_WORKGROUP_NAME}
-    outputLocation: ${HMPPS_ATHENA_OUTPUT_LOCATION}
     prisonerDatabase: ${HMPPS_GLUE_DATABASE_NAME}
     prisonerTable: ${HMPPS_GLUE_TABLE_NAME}
     prisonerWorkgroup: ${HMPPS_ATHENA_WORKGROUP_NAME}
@@ -113,11 +109,7 @@ hmpps:
   sqs:
     queueAdminRole: ROLE_AUDIT_API_QUEUE_ADMIN
     queues:
-      auditqueue:
-        asyncQueueClient: true
       prisonerauditqueue:
-        asyncQueueClient: true
-      auditusersqueue:
         asyncQueueClient: true
 
   repository:
