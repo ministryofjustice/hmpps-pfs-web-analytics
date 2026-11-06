@@ -13,17 +13,12 @@ import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaProperties
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaPropertiesFactory
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.PrisonerAuditRepository
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.PrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEvent
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.toPrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditFilterDto
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditDto
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditAthenaClient
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditS3Client
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.PrisonerAuditService
 import java.time.Instant
 import java.util.UUID
@@ -31,18 +26,10 @@ import java.util.UUID
 class PrisonerAuditServiceTest {
   private val telemetryClient: TelemetryClient = mock()
   private val prisonerAuditRepository: PrisonerAuditRepository = mock()
-  private val auditS3Client: AuditS3Client = mock()
-  private val auditAthenaClient: AuditAthenaClient = mock()
-  private val athenaPropertiesFactory: AthenaPropertiesFactory = mock()
-  private val saveToS3Bucket = false
   private var auditService =
     PrisonerAuditService(
       telemetryClient,
       prisonerAuditRepository,
-      auditS3Client,
-      auditAthenaClient,
-      athenaPropertiesFactory,
-      saveToS3Bucket,
     )
 
   @Nested
@@ -389,35 +376,12 @@ class PrisonerAuditServiceTest {
     )
 
     @Test
-    fun `save audit event to database when saveToS3Bucket is false`() {
-      auditService = PrisonerAuditService(telemetryClient, prisonerAuditRepository, auditS3Client, auditAthenaClient, athenaPropertiesFactory, false)
+    fun `save audit event to database`() {
+      auditService = PrisonerAuditService(telemetryClient, prisonerAuditRepository)
 
       auditService.saveAuditEvent(auditEvent)
 
-      then(auditS3Client).shouldHaveNoInteractions()
-      then(auditAthenaClient).shouldHaveNoInteractions()
-      then(prisonerAuditRepository).should().save(auditEvent.toPrisonerAuditEvent())
-    }
-
-    @Test
-    fun `save audit event to S3 bucket when saveToS3Bucket is true`() {
-      whenever(athenaPropertiesFactory.getProperties(AuditEventType.PRISONER)).thenReturn(athenaProperties)
-      auditService = PrisonerAuditService(telemetryClient, prisonerAuditRepository, auditS3Client, auditAthenaClient, athenaPropertiesFactory, true)
-
-      auditService.saveAuditEvent(auditEvent)
-
-      then(auditS3Client).should().save(auditEvent, athenaProperties.s3BucketName)
-      then(auditAthenaClient).should().addPartitionForEvent(auditEvent, athenaProperties)
       then(prisonerAuditRepository).should().save(auditEvent.toPrisonerAuditEvent())
     }
   }
-
-  private val athenaProperties = AthenaProperties(
-    auditEventType = AuditEventType.PRISONER,
-    s3BucketName = "hmpps-audit-bucket",
-    databaseName = "the-database",
-    tableName = "the-table",
-    workGroupName = "the-workgroup",
-    outputLocation = "the-location",
-  )
 }

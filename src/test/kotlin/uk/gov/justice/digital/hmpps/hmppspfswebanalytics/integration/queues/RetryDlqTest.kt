@@ -8,13 +8,11 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.springframework.http.MediaType
-import org.springframework.test.context.TestPropertySource
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.PrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.QueueListenerIntegrationTest
 import java.util.concurrent.TimeUnit
 
-@TestPropertySource(properties = ["hmpps.repository.saveToS3Bucket=false"])
 class RetryDlqTest : QueueListenerIntegrationTest() {
 
   @Nested

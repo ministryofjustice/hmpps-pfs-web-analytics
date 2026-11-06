@@ -10,14 +10,6 @@ oauth:
 
 aws:
   provider: localstack
-  athena:
-    prisonerDatabase: "the-prisoner-database"
-    prisonerTable: "the-prisoner-table"
-    prisonerWorkgroup: "the-prisoner-workgroup"
-    prisonerOutputLocation: "the-prisoner-location"
-  s3:
-    auditBucketName: "hmpps-audit-bucket"
-    prisonerAuditBucketName: "hmpps-prisoner-audit-bucket"
 
 hmpps.sqs:
   provider: localstack
@@ -41,8 +33,6 @@ spring:
     default-schema: prisoner
 
 hmpps:
-  repository:
-    saveToS3Bucket: true
   audit:
     queriesStartDate: 2024-01-01
 

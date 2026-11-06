@@ -11,10 +11,8 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
 import org.mockito.kotlin.mockingDetails
 import org.mockito.kotlin.verify
-import org.mockito.kotlin.verifyNoInteractions
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
-import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
 import org.springframework.web.reactive.function.BodyInserters
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
@@ -25,7 +23,6 @@ import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.QueueListenerI
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
-@TestPropertySource(properties = ["hmpps.repository.saveToS3Bucket=false"])
 class AuditTestDatabase @Autowired constructor(
   override var webTestClient: WebTestClient,
 ) : QueueListenerIntegrationTest() {
@@ -84,7 +81,6 @@ class AuditTestDatabase @Autowired constructor(
 
     verify(telemetryClient).trackEvent(eq("hmpps-prisoner-audit"), any(), isNull())
     verify(prisonerAuditRepository).save(any<PrisonerAuditEvent>())
-    verifyNoInteractions(auditS3Client)
   }
 
   @Test
@@ -110,6 +106,5 @@ class AuditTestDatabase @Autowired constructor(
 
     verify(telemetryClient).trackEvent(eq("hmpps-prisoner-audit"), any(), isNull())
     verify(prisonerAuditRepository).save(auditEvent.toPrisonerAuditEvent())
-    verifyNoInteractions(auditS3Client)
   }
 }
