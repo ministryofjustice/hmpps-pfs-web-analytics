@@ -12,10 +12,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.web.reactive.server.WebTestClient
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaProperties
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.S3TestConfig
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.integration.endtoend.CommandLineProfilesResolver
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditQueueService
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.PrisonerAuditService
 import uk.gov.justice.hmpps.sqs.HmppsQueueFactory
@@ -27,7 +24,7 @@ import uk.gov.justice.hmpps.test.kotlin.auth.JwtAuthorisationHelper
 @AutoConfigureWebTestClient
 @Suppress("SpringJavaInjectionPointsAutowiringInspection")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(IntegrationTest.SqsConfig::class, JwtAuthorisationHelper::class, S3TestConfig::class)
+@Import(IntegrationTest.SqsConfig::class, JwtAuthorisationHelper::class)
 @ActiveProfiles(resolver = CommandLineProfilesResolver::class)
 abstract class IntegrationTest {
   @Autowired
@@ -61,15 +58,6 @@ abstract class IntegrationTest {
   protected val awsSqsPrisonerAuditDlqClient by lazy { prisonerAuditQueueConfig.sqsDlqClient as SqsAsyncClient }
   protected val awsSqsPrisonerAuditUrl by lazy { prisonerAuditQueueConfig.queueUrl }
   protected val awsSqsPrisonerAuditDlqUrl by lazy { prisonerAuditQueueConfig.dlqUrl as String }
-
-  protected val prisonerAthenaProperties = AthenaProperties(
-    auditEventType = AuditEventType.PRISONER,
-    s3BucketName = "hmpps-prisoner-audit-bucket",
-    databaseName = "the-prisoner-database",
-    tableName = "the-prisoner-table",
-    workGroupName = "the-prisoner-workgroup",
-    outputLocation = "the-prisoner-location",
-  )
 
   @MockitoSpyBean
   @Qualifier("prisonerauditqueue-sqs-client")

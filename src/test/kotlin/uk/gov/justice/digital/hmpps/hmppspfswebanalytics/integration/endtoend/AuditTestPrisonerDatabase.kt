@@ -11,14 +11,12 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
 import org.mockito.kotlin.verify
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.PrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.QueueListenerIntegrationTest
 import java.util.concurrent.TimeUnit
 
-@TestPropertySource(properties = ["hmpps.repository.saveToS3Bucket=false"])
 class AuditTestPrisonerDatabase @Autowired constructor(
   override var webTestClient: WebTestClient,
 ) : QueueListenerIntegrationTest() {

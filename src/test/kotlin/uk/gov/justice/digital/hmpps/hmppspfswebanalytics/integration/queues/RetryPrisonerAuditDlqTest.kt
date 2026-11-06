@@ -5,16 +5,11 @@ import org.awaitility.kotlin.matches
 import org.awaitility.kotlin.untilCallTo
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.verify
 import org.springframework.http.MediaType
-import org.springframework.test.context.TestPropertySource
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.QueueListenerIntegrationTest
 import java.util.concurrent.TimeUnit
 
-@TestPropertySource(properties = ["hmpps.repository.saveToS3Bucket=true"])
 class RetryPrisonerAuditDlqTest : QueueListenerIntegrationTest() {
 
   @Nested
@@ -85,8 +80,6 @@ class RetryPrisonerAuditDlqTest : QueueListenerIntegrationTest() {
         .expectStatus().isOk
       await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 0 }
       await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
-
-      verify(auditS3Client).save(any<AuditEvent>(), any())
     }
   }
 
@@ -119,8 +112,6 @@ class RetryPrisonerAuditDlqTest : QueueListenerIntegrationTest() {
         .expectStatus().isOk
       await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 0 }
       await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
-
-      verify(auditS3Client).save(any<AuditEvent>(), any())
     }
   }
 }
