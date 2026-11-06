@@ -15,8 +15,8 @@ spring:
     show-sql: true
   flyway:
     locations: classpath:/db/audit,/db/audit_h2
-    schemas: staff,prisoner
-    default-schema: staff
+    schemas: prisoner
+    default-schema: prisoner
 
 hmpps:
   repository:
@@ -26,14 +26,6 @@ hmpps:
   sqs:
     provider: localstack
     queues:
-      auditqueue:
-        queueName: mainQueue
-        asyncQueueClient: true
-        dlqName: mainDlq
-      auditusersqueue:
-        queueName: auditUsersQueue
-        asyncQueueClient: true
-        dlqName: auditUsersDlq
       prisonerauditqueue:
         queueName: prisonerQueue
         asyncQueueClient: true

@@ -11,10 +11,6 @@ oauth:
 aws:
   provider: localstack
   athena:
-    database: "the-database"
-    table: "the-table"
-    workgroup: "the-workgroup"
-    outputLocation: "the-location"
     prisonerDatabase: "the-prisoner-database"
     prisonerTable: "the-prisoner-table"
     prisonerWorkgroup: "the-prisoner-workgroup"
@@ -26,14 +22,6 @@ aws:
 hmpps.sqs:
   provider: localstack
   queues:
-    auditqueue:
-      queueName: ${random.uuid}
-      asyncQueueClient: true
-      dlqName: ${random.uuid}
-    auditusersqueue:
-      queueName: ${random.uuid}
-      asyncQueueClient: true
-      dlqName: ${random.uuid}
     prisonerauditqueue:
       queueName: ${random.uuid}
       asyncQueueClient: true
@@ -49,8 +37,8 @@ spring:
     show-sql: true
   flyway:
     locations: classpath:db/audit,db/audit_{vendor}
-    schemas: staff,prisoner,person_on_probation
-    default-schema: staff
+    schemas: prisoner
+    default-schema: prisoner
 
 hmpps:
   repository:

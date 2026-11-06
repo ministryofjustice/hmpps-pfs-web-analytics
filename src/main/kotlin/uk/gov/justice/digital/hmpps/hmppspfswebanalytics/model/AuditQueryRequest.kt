@@ -10,7 +10,7 @@ open class AuditQueryRequest(
   @Schema(
     required = true,
     description = "Audit event type",
-    example = "STAFF",
+    example = "PRISONER",
   )
   var auditEventType: AuditEventType,
 

@@ -5,13 +5,11 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.mockito.kotlin.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.IntegrationTest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.PrisonerAuditRepository
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.PrisonerAuditEvent
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditFilterDto
 import java.time.Instant
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -90,11 +88,6 @@ class PrisonerAuditResourcePagingTest : IntegrationTest() {
       .jsonPath("$.last").isEqualTo(true)
       .jsonPath("$.content[0].who").isEqualTo("bobby.beans")
       .jsonPath("$.content[1].who").isEqualTo("freddy.frog")
-
-    verify(auditQueueService).sendAuditAuditEvent(
-      "AUDIT_GET_ALL_PAGED",
-      AuditFilterDto(startDateTime = null, endDateTime = null, service = "launchpad", who = null, what = null),
-    )
   }
 
   @Test
@@ -114,11 +107,6 @@ class PrisonerAuditResourcePagingTest : IntegrationTest() {
       .jsonPath("$.content[0].who").isEqualTo("freddy.frog")
       .jsonPath("$.content[1].who").isEqualTo("bobby.beans")
       .jsonPath("$.content[2].who").doesNotExist()
-
-    verify(auditQueueService).sendAuditAuditEvent(
-      "AUDIT_GET_ALL_PAGED",
-      AuditFilterDto(startDateTime = null, endDateTime = null, service = "launchpad", who = null, what = null),
-    )
   }
 
   @Test
