@@ -38,13 +38,6 @@ class AthenaPartitionRepairService(
   }
 
   @Scheduled(cron = "0 0 0 1 * *")
-  fun triggerRepairPartitions() {
-    if (saveToS3Bucket) {
-      triggerRepairPartitions(AuditEventType.STAFF)
-    }
-  }
-
-  @Scheduled(cron = "0 0 0 1 * *")
   fun triggerPrisonerRepairPartitions() {
     if (saveToS3Bucket) {
       triggerRepairPartitions(AuditEventType.PRISONER)

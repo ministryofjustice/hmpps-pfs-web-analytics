@@ -25,7 +25,6 @@ import software.amazon.awssdk.services.athena.model.StartQueryExecutionRequest
 import software.amazon.awssdk.services.athena.model.StartQueryExecutionResponse
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.IntegrationTest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.PRISONER
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.STAFF
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryRequest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditDto
 import java.time.Instant
@@ -153,26 +152,6 @@ class PrisonerAuditAthenaResourceTest : IntegrationTest() {
   }
 
   @Test
-  fun invalidEventType() {
-    webTestClient.post().uri("/audit/prisoner/query")
-      .headers(setAuthorisation(roles = listOf("ROLE_PRISONER_AUDIT", "ROLE_QUERY_AUDIT__HMPPS_LAUNCHPAD_UI"), scopes = listOf("read")))
-      .body(
-        BodyInserters.fromValue(
-          AuditQueryRequest(
-            auditEventType = STAFF,
-            startDate = LocalDate.of(2025, 1, 1),
-            endDate = LocalDate.of(2025, 1, 5),
-            subjectId = "test-subject",
-            subjectType = "USER_ID",
-          ),
-        ),
-      )
-      .exchange()
-      .expectStatus().isBadRequest
-      .expectBody().json("prisoner_start_query_response_invalid_event_type".loadJson(), STRICT)
-  }
-
-  @Test
   fun getQueryResults() {
     given(athenaClient.getQueryExecution(getQueryExecutionRequest)).willReturn(successfulGetQueryExecutionResponse)
     given(athenaClient.getQueryResults(getQueryResultsRequest)).willReturn(getQueryResultsResponse)
@@ -184,5 +163,5 @@ class PrisonerAuditAthenaResourceTest : IntegrationTest() {
       .expectBody().json("prisoner_get_query_results_response".loadJson(), STRICT)
   }
   private fun columnInfo(name: String): ColumnInfo = ColumnInfo.builder().name(name).type("string").build()
-  private fun String.loadJson(): String = StaffAuditRDSResourceTest::class.java.getResource("$this.json")!!.readText()
+  private fun String.loadJson(): String = PrisonerAuditRDSResourceTest::class.java.getResource("$this.json")!!.readText()
 }

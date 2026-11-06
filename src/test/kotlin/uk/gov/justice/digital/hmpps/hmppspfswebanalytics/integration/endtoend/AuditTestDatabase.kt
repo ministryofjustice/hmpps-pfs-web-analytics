@@ -18,9 +18,9 @@ import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
 import org.springframework.web.reactive.function.BodyInserters
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.StaffAuditEvent
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.PrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEvent
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.toStaffAuditEvent
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.toPrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.QueueListenerIntegrationTest
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -30,7 +30,7 @@ class AuditTestDatabase @Autowired constructor(
   override var webTestClient: WebTestClient,
 ) : QueueListenerIntegrationTest() {
 
-  private val basicAuditEvent = AuditEvent(what = "basicAuditEvent", service = "hmpps-audit-poc-ui")
+  private val basicAuditEvent = AuditEvent(what = "basicAuditEvent", service = "hmpps-prisoner-audit-poc-ui")
 
   @Test
   fun `will consume an audit event message`() {
@@ -47,16 +47,16 @@ class AuditTestDatabase @Autowired constructor(
     }
     """
 
-    await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnQueue() } matches { it == 0 }
+    await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
 
     awsSqsClient.sendMessage(
-      SendMessageRequest.builder().queueUrl(awsSqsUrl).messageBody(message).build(),
+      SendMessageRequest.builder().queueUrl(awsSqsPrisonerAuditUrl).messageBody(message).build(),
     )
 
-    await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnQueue() } matches { it == 0 }
+    await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditQueue() } matches { it == 0 }
 
     verify(telemetryClient).trackEvent(
-      eq("hmpps-audit"),
+      eq("hmpps-prisoner-audit"),
       check {
         assertThat(it["what"]).isEqualTo("OFFENDER_DELETED")
         assertThat(it["when"]).isEqualTo("2021-01-25T12:30:00Z")
@@ -67,23 +67,23 @@ class AuditTestDatabase @Autowired constructor(
       },
       isNull(),
     )
-    verify(staffAuditRepository).save(any<StaffAuditEvent>())
+    verify(prisonerAuditRepository).save(any<PrisonerAuditEvent>())
   }
 
   @Test
   fun `save basic audit entry to database`() {
     webTestClient.post()
-      .uri("/audit")
-      .headers(setAuthorisation(roles = listOf("ROLE_AUDIT"), scopes = listOf("write")))
+      .uri("/audit/prisoner")
+      .headers(setAuthorisation(roles = listOf("ROLE_PRISONER_AUDIT"), scopes = listOf("write")))
       .contentType(MediaType.APPLICATION_JSON)
       .body(BodyInserters.fromValue(basicAuditEvent))
       .exchange()
       .expectStatus().isAccepted
 
-    await.atMost(5, TimeUnit.SECONDS) untilCallTo { mockingDetails(staffAuditRepository).invocations.size } matches { it == 1 }
+    await.atMost(5, TimeUnit.SECONDS) untilCallTo { mockingDetails(prisonerAuditRepository).invocations.size } matches { it == 1 }
 
-    verify(telemetryClient).trackEvent(eq("hmpps-audit"), any(), isNull())
-    verify(staffAuditRepository).save(any<StaffAuditEvent>())
+    verify(telemetryClient).trackEvent(eq("hmpps-prisoner-audit"), any(), isNull())
+    verify(prisonerAuditRepository).save(any<PrisonerAuditEvent>())
     verifyNoInteractions(auditS3Client)
   }
 
@@ -99,17 +99,17 @@ class AuditTestDatabase @Autowired constructor(
     )
 
     webTestClient.post()
-      .uri("/audit")
-      .headers(setAuthorisation(roles = listOf("ROLE_AUDIT"), scopes = listOf("write")))
+      .uri("/audit/prisoner")
+      .headers(setAuthorisation(roles = listOf("ROLE_PRISONER_AUDIT"), scopes = listOf("write")))
       .contentType(MediaType.APPLICATION_JSON)
       .body(BodyInserters.fromValue(auditEvent))
       .exchange()
       .expectStatus().isAccepted
 
-    await.atMost(5, TimeUnit.SECONDS) untilCallTo { mockingDetails(staffAuditRepository).invocations.size } matches { it == 1 }
+    await.atMost(5, TimeUnit.SECONDS) untilCallTo { mockingDetails(prisonerAuditRepository).invocations.size } matches { it == 1 }
 
-    verify(telemetryClient).trackEvent(eq("hmpps-audit"), any(), isNull())
-    verify(staffAuditRepository).save(auditEvent.toStaffAuditEvent())
+    verify(telemetryClient).trackEvent(eq("hmpps-prisoner-audit"), any(), isNull())
+    verify(prisonerAuditRepository).save(auditEvent.toPrisonerAuditEvent())
     verifyNoInteractions(auditS3Client)
   }
 }

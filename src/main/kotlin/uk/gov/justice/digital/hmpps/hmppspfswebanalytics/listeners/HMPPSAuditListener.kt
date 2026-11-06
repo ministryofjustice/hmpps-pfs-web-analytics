@@ -18,17 +18,6 @@ class HMPPSAuditListener(
   private val objectMapper: ObjectMapper,
 ) {
 
-  @SqsListener("auditqueue", factory = "hmppsQueueContainerFactoryProxy")
-  fun onAuditEvent(message: String) {
-    val patchedJson = patchSubjectTypeIfMissing(message)
-    val auditEvent: AuditEvent = objectMapper.readValue(patchedJson, AuditEvent::class.java)
-
-    val cleansedAuditEvent = auditEvent.copy(
-      details = auditEvent.details?.jsonString(),
-    )
-    auditServiceFactory.getAuditService(AuditEventType.STAFF).saveAuditEvent(cleansedAuditEvent)
-  }
-
   @SqsListener("prisonerauditqueue", factory = "hmppsQueueContainerFactoryProxy")
   fun onPrisonerAuditEvent(message: String) {
     val patchedJson = patchSubjectTypeIfMissing(message)

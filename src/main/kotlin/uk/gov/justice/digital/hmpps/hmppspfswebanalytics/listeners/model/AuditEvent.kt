@@ -6,7 +6,6 @@ import jakarta.persistence.Column
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.Id
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.PrisonerAuditEvent
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.StaffAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.addIfNotNull
 import java.time.Instant
 import java.util.UUID
@@ -52,19 +51,6 @@ fun AuditEvent.asMap(): Map<String, String> {
 }
 
 fun AuditEvent.toPrisonerAuditEvent(): PrisonerAuditEvent = PrisonerAuditEvent(
-  id = id,
-  what = what,
-  `when` = `when`,
-  operationId = operationId,
-  subjectId = subjectId,
-  subjectType = subjectType,
-  correlationId = correlationId,
-  who = who,
-  service = service,
-  details = details,
-)
-
-fun AuditEvent.toStaffAuditEvent(): StaffAuditEvent = StaffAuditEvent(
   id = id,
   what = what,
   `when` = `when`,

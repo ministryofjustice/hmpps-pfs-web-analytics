@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Hidden
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import jakarta.validation.Valid
+import jakarta.validation.ValidationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
@@ -86,7 +87,7 @@ class PrisonerAuditResource(
     @RequestBody @Valid auditFilterDto: AuditQueryRequest,
   ): AuditQueryResponse {
     if (auditFilterDto.auditEventType != AuditEventType.PRISONER) {
-      throw EventTypeException("Incorrect event type used")
+      throw EventTypeException("Incorrect event type used") as Throwable
     }
     auditQueueService.sendAuditAuditEvent(
       AuditType.AUDIT_GET_BY_USER.name,
@@ -125,3 +126,5 @@ class PrisonerAuditResource(
     "{\"details\":\"$this\"}"
   }
 }
+
+class EventTypeException(message: String) : ValidationException(message)

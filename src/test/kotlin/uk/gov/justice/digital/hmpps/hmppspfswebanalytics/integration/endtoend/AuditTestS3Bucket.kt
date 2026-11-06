@@ -10,7 +10,6 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
 import org.mockito.kotlin.mockingDetails
 import org.mockito.kotlin.verify
-import org.mockito.kotlin.verifyNoInteractions
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
@@ -32,8 +31,8 @@ class AuditTestS3Bucket @Autowired constructor(
   @Test
   fun `save basic audit entry to S3 bucket`() {
     webTestClient.post()
-      .uri("/audit")
-      .headers(setAuthorisation(roles = listOf("ROLE_AUDIT"), scopes = listOf("write")))
+      .uri("/audit/prisoner")
+      .headers(setAuthorisation(roles = listOf("ROLE_PRISONER_AUDIT"), scopes = listOf("write")))
       .contentType(MediaType.APPLICATION_JSON)
       .body(BodyInserters.fromValue(basicAuditEvent))
       .exchange()
@@ -41,7 +40,7 @@ class AuditTestS3Bucket @Autowired constructor(
 
     await.atMost(5, TimeUnit.SECONDS) untilCallTo { mockingDetails(auditS3Client).invocations.size } matches { it!! >= 1 }
 
-    verify(telemetryClient).trackEvent(eq("hmpps-audit"), any(), isNull())
+    verify(telemetryClient).trackEvent(eq("hmpps-prisoner-audit"), any(), isNull())
     verify(auditS3Client).save(
       argThat {
         what == "basicAuditEvent" &&
@@ -49,10 +48,10 @@ class AuditTestS3Bucket @Autowired constructor(
           subjectType == "NOT_APPLICABLE" &&
           id != null
       },
-      eq(staffAthenaProperties.s3BucketName),
+      eq(prisonerAthenaProperties.s3BucketName),
     )
 
-    verify(staffAuditRepository).save(
+    verify(prisonerAuditRepository).save(
       argThat {
         what == "basicAuditEvent" &&
           service == "hmpps-audit-poc-ui" &&
@@ -60,6 +59,5 @@ class AuditTestS3Bucket @Autowired constructor(
           id != null
       },
     )
-    verifyNoInteractions(prisonerAuditRepository)
   }
 }

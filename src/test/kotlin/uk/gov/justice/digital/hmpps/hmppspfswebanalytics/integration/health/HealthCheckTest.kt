@@ -25,21 +25,6 @@ class HealthCheckTest : QueueListenerIntegrationTest() {
   }
 
   @Test
-  fun `Queue health reports audit queue details`() {
-    await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnDlq() } matches { it == 0 }
-    webTestClient.get().uri("/health")
-      .exchange()
-      .expectStatus().isOk
-      .expectBody()
-      .jsonPath("components.auditqueue-health.details.queueName").isEqualTo(auditQueueConfig.queueName)
-      .jsonPath("components.auditqueue-health.details.messagesOnQueue").isEqualTo(0)
-      .jsonPath("components.auditqueue-health.details.messagesInFlight").isEqualTo(0)
-      .jsonPath("components.auditqueue-health.details.messagesOnDlq").isEqualTo(0)
-      .jsonPath("components.auditqueue-health.details.dlqStatus").isEqualTo("UP")
-      .jsonPath("components.auditqueue-health.details.dlqName").isEqualTo(auditQueueConfig.dlqName!!)
-  }
-
-  @Test
   fun `Queue health reports prisoner audit queue details`() {
     await.atMost(5, TimeUnit.SECONDS) untilCallTo { getNumberOfMessagesCurrentlyOnPrisonerAuditDlq() } matches { it == 0 }
     webTestClient.get().uri("/health")

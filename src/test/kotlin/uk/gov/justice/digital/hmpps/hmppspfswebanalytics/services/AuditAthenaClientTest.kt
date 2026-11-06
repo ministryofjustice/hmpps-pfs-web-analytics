@@ -38,7 +38,7 @@ import software.amazon.awssdk.services.athena.model.StartQueryExecutionResponse
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaProperties
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaPropertiesFactory
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEvent
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.STAFF
+import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEventType.PRISONER
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryRequest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryResponse
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditDto
@@ -72,7 +72,7 @@ class AuditAthenaClientTest {
       .statistics(QueryExecutionStatistics.builder().build()).build(),
   ).build()
   private val athenaProperties = AthenaProperties(
-    auditEventType = STAFF,
+    auditEventType = PRISONER,
     databaseName = "databaseName",
     tableName = "tableName",
     workGroupName = "workGroupName",
@@ -138,10 +138,10 @@ class AuditAthenaClientTest {
         .willReturn(StartQueryExecutionResponse.builder().queryExecutionId(queryExecutionId).build())
 
       // When
-      whenever(athenaPropertiesFactory.getProperties(STAFF)).thenReturn(athenaProperties)
+      whenever(athenaPropertiesFactory.getProperties(PRISONER)).thenReturn(athenaProperties)
       val response: AuditQueryResponse = auditAthenaClient.triggerQuery(
         auditQueryRequest,
-        STAFF,
+        PRISONER,
       )
 
       // Then
@@ -154,7 +154,7 @@ class AuditAthenaClientTest {
       // All fields
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 1),
           endDate = LocalDate.of(2025, 1, 5),
           who = "someone",
@@ -170,7 +170,7 @@ class AuditAthenaClientTest {
       // Subject, no who
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 1),
           endDate = LocalDate.of(2025, 1, 5),
           subjectId = "subjectId",
@@ -185,7 +185,7 @@ class AuditAthenaClientTest {
       // Subject + startDate, no who, no endDate
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 25),
           subjectId = "subjectId",
           subjectType = "subjectType",
@@ -199,7 +199,7 @@ class AuditAthenaClientTest {
       // Subject + endDate, no who, no startDate
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           endDate = LocalDate.of(2025, 1, 10),
           subjectId = "subjectId",
           subjectType = "subjectType",
@@ -213,7 +213,7 @@ class AuditAthenaClientTest {
       // StartDate + endDate + who, no subject
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 1),
           endDate = LocalDate.of(2025, 1, 15),
           who = "someone",
@@ -227,7 +227,7 @@ class AuditAthenaClientTest {
       // startDate + who, no subject, no endDate
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 25),
           who = "someone",
         ),
@@ -240,7 +240,7 @@ class AuditAthenaClientTest {
       // Authorised to query all services — no service IN clause
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 1),
           endDate = LocalDate.of(2025, 1, 5),
           who = "someone",
@@ -254,7 +254,7 @@ class AuditAthenaClientTest {
       // No authorised services
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 31),
           who = "someone",
         ),
@@ -267,7 +267,7 @@ class AuditAthenaClientTest {
       // Values containing single quotes are passed as-is via parameterised execution — no escaping in the query string
       Arguments.of(
         AuditQueryRequest(
-          auditEventType = STAFF,
+          auditEventType = PRISONER,
           startDate = LocalDate.of(2025, 1, 1),
           endDate = LocalDate.of(2025, 1, 2),
           who = "O'Reilly",

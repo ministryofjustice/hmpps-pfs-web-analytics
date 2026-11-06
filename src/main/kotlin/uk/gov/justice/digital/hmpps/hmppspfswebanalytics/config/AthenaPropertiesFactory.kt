@@ -6,12 +6,10 @@ import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEv
 
 @Component
 class AthenaPropertiesFactory(
-  @Qualifier("staffAthenaProperties") private val staffAthenaProperties: AthenaProperties,
   @Qualifier("prisonerAthenaProperties") private val prisonerAthenaProperties: AthenaProperties,
 ) {
 
   private val propertiesMap: Map<AuditEventType, AthenaProperties> = mapOf(
-    AuditEventType.STAFF to staffAthenaProperties,
     AuditEventType.PRISONER to prisonerAthenaProperties,
   )
 
