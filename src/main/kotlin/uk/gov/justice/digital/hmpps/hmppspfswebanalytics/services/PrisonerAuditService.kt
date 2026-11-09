@@ -1,14 +1,11 @@
 package uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services
 
 import com.microsoft.applicationinsights.TelemetryClient
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.data.domain.Sort.Direction.DESC
 import org.springframework.stereotype.Service
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaProperties
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.AthenaPropertiesFactory
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.config.trackEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.PrisonerAuditRepository
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.model.toAuditEvent
@@ -17,33 +14,18 @@ import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.AuditEv
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.asMap
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.model.toPrisonerAuditEvent
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditFilterDto
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryRequest
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.model.AuditQueryResponse
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.resource.model.AuditDto
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditQueueService.Companion.log
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.SafeLogSanitizer.sanitize
-import java.util.UUID
 
 @Service
 class PrisonerAuditService(
   private val telemetryClient: TelemetryClient,
   private val prisonerAuditRepository: PrisonerAuditRepository,
-  private val auditS3Client: AuditS3Client,
-  private val auditAthenaClient: AuditAthenaClient,
-  private val athenaPropertiesFactory: AthenaPropertiesFactory,
-  @param:Value("\${hmpps.repository.saveToS3Bucket}") private val saveToS3Bucket: Boolean,
-
 ) : AuditServiceInterface {
   override fun saveAuditEvent(
     auditEvent: AuditEvent,
   ) {
-    if (saveToS3Bucket) {
-      val athenaProperties: AthenaProperties = athenaPropertiesFactory.getProperties(AuditEventType.PRISONER)
-      auditEvent.id = UUID.randomUUID()
-      auditS3Client.save(auditEvent, athenaProperties.s3BucketName)
-      auditAthenaClient.addPartitionForEvent(auditEvent, athenaProperties)
-    }
-
     prisonerAuditRepository.save(auditEvent.toPrisonerAuditEvent())
 
     telemetryClient.trackEvent(AuditEventType.PRISONER.description, auditEvent.asMap())
@@ -81,11 +63,4 @@ class PrisonerAuditService(
         .map { AuditDto(it.toAuditEvent()) }
     }
   }
-
-  override fun triggerQuery(
-    queryRequest: AuditQueryRequest,
-    auditEventType: AuditEventType,
-  ): AuditQueryResponse = auditAthenaClient.triggerQuery(queryRequest, auditEventType)
-
-  override fun getQueryResults(queryExecutionId: String): AuditQueryResponse = auditAthenaClient.getAuditEventsQueryResults(queryExecutionId)
 }

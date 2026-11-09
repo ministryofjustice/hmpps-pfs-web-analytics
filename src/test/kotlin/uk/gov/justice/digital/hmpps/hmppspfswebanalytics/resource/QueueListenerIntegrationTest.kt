@@ -7,7 +7,6 @@ import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.IntegrationTest
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.jpa.PrisonerAuditRepository
 import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.listeners.HMPPSAuditListener
-import uk.gov.justice.digital.hmpps.hmppspfswebanalytics.services.AuditS3Client
 import uk.gov.justice.hmpps.sqs.HmppsQueue
 import uk.gov.justice.hmpps.sqs.countAllMessagesOnQueue
 
@@ -18,9 +17,6 @@ abstract class QueueListenerIntegrationTest : IntegrationTest() {
 
   @MockitoBean
   lateinit var prisonerAuditRepository: PrisonerAuditRepository
-
-  @MockitoBean
-  lateinit var auditS3Client: AuditS3Client
 
   @Autowired
   protected lateinit var listener: HMPPSAuditListener

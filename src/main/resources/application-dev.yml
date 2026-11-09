@@ -19,8 +19,6 @@ spring:
     default-schema: prisoner
 
 hmpps:
-  repository:
-    saveToS3Bucket: true
   audit:
     queriesStartDate: 2024-01-01
   sqs:
