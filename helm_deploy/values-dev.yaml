@@ -4,7 +4,7 @@ generic-service:
   replicaCount: 2
 
   ingress:
-    host: audit-api-dev.hmpps.service.justice.gov.uk
+    host: hmpps-pfs-web-analytics-dev.hmpps.service.justice.gov.uk
     className: modsec-non-prod
 
   scheduledDowntime:
@@ -18,16 +18,8 @@ generic-service:
     SPRINGDOC_API-DOCS_ENABLED: "true"
     SPRINGDOC_SWAGGER-UI_ENABLED: "true"
 
-# CloudPlatform AlertManager receiver to route promethues alerts to slack
-# See https://user-guide.cloud-platform.service.justice.gov.uk/documentation/monitoring-an-app/how-to-create-alarms.html#creating-your-own-custom-alerts
 generic-prometheus-alerts:
-  businessHoursOnly: true
-  sqsNumberAlertQueueMappings:
-    Prisoner:
-      - "Digital-Prison-Services-dev-hmpps_prisoner_audit_queue"
-      - "Digital-Prison-Services-dev-hmpps_prisoner_audit_dlq"
-  rdsAlertsDatabases:
-    cloud-platform-f6d47a99708f20d5: "hmpps audit api"
+  targetApplication: hmpps-pfs-web-analytics
 
 cron:
   retry_dlqs_schedule: "*/10 7-20 * * 1-5"

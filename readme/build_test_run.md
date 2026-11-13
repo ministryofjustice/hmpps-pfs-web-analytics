@@ -10,7 +10,7 @@ To build the project (without tests):
 
 To rebuild the docker image locally after building the project (perhaps after some new changes), run:
 ```
-docker build -t quay.io/hmpps/hmpps-audit-api:latest .
+docker build -t quay.io/hmpps/hmpps-pfs-web-analytics:latest .
 ```
 
 ## Testing 
@@ -20,7 +20,7 @@ docker build -t quay.io/hmpps/hmpps-audit-api:latest .
 Tests need [LocalStack](https://localstack.cloud/) to be up and running, this can be done manually.
 
 ```bash
-TMPDIR=/private$TMPDIR docker compose up localstack
+TMPDIR=/private$TMPDIR docker-compose up localstack -d
 ```
 
 ### Test Database

@@ -35,7 +35,7 @@ jobs:
   helm_lint:
     strategy:
       matrix:
-        environments: ['dev', 'preprod', 'prod']
+        environments: ['dev', 'staging', 'preprod', 'prod']
     name: helm lint
     uses: ministryofjustice/hmpps-github-actions/.github/workflows/test_helm_lint.yml@v2 # WORKFLOW_VERSION
     secrets: inherit
@@ -103,7 +103,7 @@ jobs:
     with:
       job_name: "Run ${{ matrix.audit_event_type }} dev integration tests"
       environment: "dev"
-      env_test_url: "https://audit-api-dev.hmpps.service.justice.gov.uk"
+      env_test_url: "https://hmpps-pfs-web-analytics-dev.hmpps.service.justice.gov.uk"
       audit_event_type: ${{ matrix.audit_event_type }}
     secrets:
       OAUTH_CLIENT_ID: ${{ secrets.OAUTH_CLIENT_ID }}
@@ -134,7 +134,7 @@ jobs:
     with:
       job_name: "Run ${{ matrix.audit_event_type }} preprod integration tests"
       environment: "preprod"
-      env_test_url: "https://audit-api-preprod.hmpps.service.justice.gov.uk"
+      env_test_url: "https://hmpps-pfs-web-analytics-preprod.hmpps.service.justice.gov.uk"
       audit_event_type: ${{ matrix.audit_event_type }}
     secrets:
       OAUTH_CLIENT_ID: ${{ secrets.PREPROD_INTEGRATION_TESTS_CLIENT_ID }}
@@ -165,7 +165,7 @@ jobs:
     with:
       job_name: "Run ${{ matrix.audit_event_type }} prod integration tests"
       environment: "prod"
-      env_test_url: "https://audit-api.hmpps.service.justice.gov.uk"
+      env_test_url: "https://hmpps-pfs-web-analytics.hmpps.service.justice.gov.uk"
       audit_event_type: ${{ matrix.audit_event_type }}
     secrets:
       OAUTH_CLIENT_ID: ${{ secrets.PROD_INTEGRATION_TESTS_CLIENT_ID }}
