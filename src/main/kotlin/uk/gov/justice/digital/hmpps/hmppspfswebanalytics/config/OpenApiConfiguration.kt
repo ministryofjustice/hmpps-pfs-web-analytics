@@ -16,16 +16,17 @@ class OpenApiConfiguration(buildProperties: BuildProperties) {
   fun customOpenAPI(): OpenAPI = OpenAPI()
     .servers(
       listOf(
-        Server().url("https://audit-api.hmpps.service.justice.gov.uk").description("Prod"),
-        Server().url("https://audit-api-preprod.hmpps.service.justice.gov.uk").description("PreProd"),
-        Server().url("https://audit-api-dev.hmpps.service.justice.gov.uk").description("Development"),
+        Server().url("https://hmpps-pfs-web-analytics.hmpps.service.justice.gov.uk").description("Prod"),
+        Server().url("https://hmpps-pfs-web-analytics-preprod.hmpps.service.justice.gov.uk").description("PreProd"),
+        Server().url("https://hmpps-pfs-web-analytics-staging.hmpps.service.justice.gov.uk").description("Staging"),
+        Server().url("https://hmpps-pfs-web-analytics-dev.hmpps.service.justice.gov.uk").description("Development"),
         Server().url("http://localhost:8080").description("Local"),
       ),
     )
     .info(
-      Info().title("Audit")
+      Info().title("PFS Web Analytics")
         .version(version)
-        .description("Audit Facility")
-        .contact(Contact().name("HMPPS Digital Studio").email("feedback@digital.justice.gov.uk")),
+        .description("Web analytics API")
+        .contact(Contact().name("HMPPS PFS Connect").email("thehub@digital.justice.gov.uk")),
     )
 }
