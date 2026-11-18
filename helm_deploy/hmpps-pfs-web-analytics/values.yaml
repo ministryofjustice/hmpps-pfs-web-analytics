@@ -56,9 +56,9 @@ generic-service:
       DATABASE_NAME: "database_name"
       DATABASE_ENDPOINT: "rds_instance_endpoint"
     sqs-analytics-queue:
-      HMPPS_SQS_QUEUES_ANALYTICS_QUEUE_NAME: "sqs_queue_name"
+      HMPPS_SQS_QUEUES_PRISONERAUDITQUEUE_QUEUE_NAME: "sqs_queue_name"
     sqs-analytics-dlq:
-      HMPPS_SQS_QUEUES_ANALYTICS_DLQ_NAME: "sqs_queue_name"
+      HMPPS_SQS_QUEUES_PRISONERAUDITQUEUE_DLQ_NAME: "sqs_queue_name"
 
   allowlist:
     groups:
