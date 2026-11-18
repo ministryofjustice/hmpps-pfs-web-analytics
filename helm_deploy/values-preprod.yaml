@@ -6,17 +6,11 @@ generic-service:
   replicaCount: 2
 
   ingress:
-    host: audit-api-preprod.hmpps.service.justice.gov.uk
+    host: hmpps-pfs-web-analytics-preprod.hmpps.service.justice.gov.uk
 
   env:
     OAUTH_ENDPOINT_URL: "http://hmpps-auth.hmpps-auth-preprod.svc.cluster.local/auth"
     APPLICATIONINSIGHTS_CONFIGURATION_FILE: applicationinsights.json
 
-# CloudPlatform AlertManager receiver to route promethues alerts to slack
 generic-prometheus-alerts:
-  sqsNumberAlertQueueMappings:
-    Prisoner:
-      - "Digital-Prison-Services-preprod-hmpps_prisoner_audit_queue"
-      - "Digital-Prison-Services-preprod-hmpps_prisoner_audit_dlq"
-  rdsAlertsDatabases:
-    cloud-platform-cc2530362d2e4b5a: "hmpps audit api"
+  targetApplication: hmpps-pfs-web-analytics

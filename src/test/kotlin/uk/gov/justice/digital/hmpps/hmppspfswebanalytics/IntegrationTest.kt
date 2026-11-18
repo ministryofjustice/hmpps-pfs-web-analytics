@@ -40,7 +40,7 @@ abstract class IntegrationTest {
   protected lateinit var jwtAuthHelper: JwtAuthorisationHelper
 
   internal fun setAuthorisation(
-    user: String = "hmpps-audit-client",
+    user: String = "hmpps-pfs-web-analytics-client",
     roles: List<String> = listOf(),
     scopes: List<String> = listOf(),
   ): (HttpHeaders) -> Unit = jwtAuthHelper.setAuthorisationHeader(username = user, roles = roles, scope = scopes)
